@@ -216,7 +216,7 @@ class Runner(object):
         print ('=' * 30)
 
         self.writer.add_scalar('test/epoch/mse_loss', self.ms['mse'].mean, cur_e)
-        self.writer.add_scalar('train/epoch/perp_loss', self.ms['perp'].mean, cur_e)
+        self.writer.add_scalar('test/epoch/perp_loss', self.ms['perp'].mean, cur_e)
         
 
 

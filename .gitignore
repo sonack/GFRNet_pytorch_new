@@ -6,4 +6,7 @@ pbs_logs/*
 __pycache__
 
 *.pbs
+*.tar.gz
+playground/*
+notes/*
 
