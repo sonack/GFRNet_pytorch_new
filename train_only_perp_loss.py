@@ -138,7 +138,7 @@ class Runner(object):
 
 
                
-
+        # epoch level info
         print ('*' * 30)
         print ('[Train]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tTot Loss=%.12f' % (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
@@ -153,6 +153,7 @@ class Runner(object):
                     )
                 )
         print ('*' * 30)
+
 
         self.writer.add_scalar('train/epoch/mse_loss', self.ms['mse'].mean, cur_e)
         self.writer.add_scalar('train/epoch/perp_loss', self.ms['perp'].mean, cur_e)
