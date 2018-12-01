@@ -1,3 +1,4 @@
+# uncond global GAN
 from __future__ import print_function, division
 from opts import opt
 from tensorboardX import SummaryWriter
@@ -9,7 +10,7 @@ import custom_transforms
 import dataset
 from torch.utils.data import Dataset, DataLoader
 import models
-from custom_utils import weight_init, create_orig_xy_map, Meter, print_inter_grad
+from custom_utils import weight_init, create_orig_xy_map, Meter
 
 from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
@@ -38,7 +39,7 @@ class Runner(object):
             self.change_model_mode(True)
             self.reset_ms()
             self.train_one_epoch(e)
-            # self.test(e)
+
             self.change_model_mode(False)
             self.reset_ms()
             self.test(e)
@@ -60,7 +61,6 @@ class Runner(object):
         for i_b, sb in enumerate(self.train_dl):
             # if i_b > 100:
             #     break
-            # with torch.no_grad():
             gd = sb['guide'].to(device)
             bl = sb['blur'].to(device)
             gt = sb['gt'].to(device)
@@ -78,28 +78,13 @@ class Runner(object):
             
             flow_l = pt_l + tv_l + sym_l
 
-
-
             mse_l = opt.mse_l_w * self.mse_crit(res, gt)
             perp_l = opt.perp_l_w * self.perp_crit(res, gt)
 
-            # permute = [2, 1, 0]
-            # restored_vgg = res * 255 - self.RGB_mean
-            # gt_vgg = gt * 255  - self.RGB_mean
-            # gt_feat = self.netVgg(gt_vgg[:, permute, ...])
-            # res_feat = self.netVgg(restored_vgg[:, permute, ...])
-
-            # perp_l = opt.perp_l_w * self.netVgg_crit(res_feat, gt_feat)
             # rec_l = mse_l
+            rec_l = perp_l
 
-            # self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter tensor grad"))
-
-            # res.register_hook(print_inter_grad("rec tensor grad"))
-
-            rec_l = perp_l + mse_l
-            # pdb.set_trace()
             tot_l = flow_l + rec_l
-
             self.G.zero_grad()
             tot_l.backward()
             self.optim.step()
@@ -181,24 +166,14 @@ class Runner(object):
                 if opt.test_sym_dir:
                     sym_gd = sb['sym_r'].to(device)
                     sym_l = opt.sym_l_w * self.sym_crit(grid, sym_gd)
-        
+            
                 flow_l = pt_l + tv_l + sym_l
 
                 mse_l = opt.mse_l_w * self.mse_crit(res, gt)
-                
-                # permute = [2, 1, 0]
-                # restored_vgg = res * 255 - self.RGB_mean
-                # gt_vgg = gt * 255  - self.RGB_mean
-                # gt_feat = self.netVgg(gt_vgg[:, permute, ...])
-                # res_feat = self.netVgg(restored_vgg[:, permute, ...])
-
-                # perp_l = opt.perp_l_w * self.netVgg_crit(res_feat, gt_feat)
-                
                 perp_l = opt.perp_l_w * self.perp_crit(res, gt)
-                # pdb.set_trace()
 
                 # rec_l = mse_l
-                rec_l = perp_l + mse_l
+                rec_l = perp_l
 
                 tot_l = flow_l + rec_l
 
@@ -225,8 +200,6 @@ class Runner(object):
                     self.ms['tot'].mean
                     )
                 )
-
-                self.writer.add_image('test/guide-gt-blur-warp-res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt]], 2), self.i_batch_tot)
         
         print ('=' * 30)
         print ('[Test]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tTot Loss=%.12f' % (
@@ -266,6 +239,9 @@ class Runner(object):
         self.mse_crit = nn.MSELoss(reduction='sum')
         self.perp_crit = VggFaceLoss(3)
         self.perp_crit.to(self.device)
+
+        
+
 
     def load_checkpoint(self):
         if not (opt.load_checkpoint or opt.load_warpnet):

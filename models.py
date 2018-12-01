@@ -183,6 +183,46 @@ class GFRNet_generator(nn.Module):
         restored_img = self.recNet(blur, warp_guide.detach())
         return warp_guide, grid, restored_img
 
+
+# GAN Global D
+class GFRNet_globalDiscriminator(nn.Module):
+    def __init__(self, ch_in):
+        super(GFRNet_globalDiscriminator, self).__init__()
+        n_layers = 4
+        ndf = 64
+
+        modules = []
+        modules.append(nn.Conv2d(ch_in, ndf, kernel_size=4, stride=2, padding=1))
+        modules.append(nn.LeakyReLU(0.2))
+
+        nf_mult = 1
+        nf_mult_prev = 1
+        for idx in range(1, n_layers):
+            nf_mult_prev = nf_mult
+            nf_mult = min(2**idx, 8)
+            modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
+            modules.append(nn.BatchNorm2d(ndf*nf_mult))
+            modules.append(nn.LeakyReLU(0.2))
+        
+        nf_mult_prev = nf_mult
+        nf_mult = min(2**n_layers, 8)
+        modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
+        modules.append(nn.BatchNorm2d(ndf*nf_mult))
+        modules.append(nn.LeakyReLU(0.2))
+
+        # modules.append(nn.Conv2d(ndf*nf_mult, 1, 4, 2))
+        modules.append(nn.Conv2d(ndf*nf_mult, ndf*nf_mult, 4, 2))
+        modules.append(nn.Conv2d(ndf*nf_mult, 1, 3))
+        # if not opt.use_lsgan:
+        modules.append(nn.Sigmoid())
+
+        self.D = nn.Sequential(*modules)
+        # print (self.D)
+
+    def forward(self, x):
+        output = self.D(x)
+        return output.view(-1, 1).squeeze(1)
+
 if __name__ == '__main__':
     G = GFRNet_generator()
     print (G)
