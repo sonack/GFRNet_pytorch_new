@@ -62,16 +62,20 @@ class VggFaceLoss(nn.Module):
         super(VggFaceLoss, self).__init__()
         self.netVgg = netVgg_conv3 if ver == 3 else netVgg_conv4
         self.netVgg.load_state_dict(torch.load('./netVggs/netVgg_conv%d.pth' % ver))
+        # self.netVgg.eval()
         self.criterion = nn.MSELoss()
 
         self.register_parameter("RGB_mean", nn.Parameter(torch.tensor([129.1863,104.7624,93.5940]).view(1, 3, 1, 1)))
-        # pdb.set_trace()
-        for param in self.netVgg.parameters():
+        # self.RGB_mean = torch.tensor([129.1863,104.7624,93.5940], device=device).view(1, 3, 1, 1)
+        # for param in self.netVgg.parameters() 会导致perp loss巨大，必须将self.RGB_mean param的requires_grad也设置为False才可以，或者使用tensor.
+        for param in self.parameters():
             param.requires_grad = False
     
     def forward(self, restored, gt):
         restored_vgg = restored * 255 - self.RGB_mean
         gt_vgg = gt * 255  - self.RGB_mean
+
+        # print ("RGB_mean =", self.RGB_mean)
         # RGB->BGR
         permute = [2, 1, 0]
         gt_feat = self.netVgg(gt_vgg[:, permute, ...])

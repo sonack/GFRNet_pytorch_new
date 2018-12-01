@@ -4,6 +4,23 @@ import numpy as np
 import math
 import torch
 from opts import opt
+
+
+class Meter():
+    def __init__(self):
+        self.reset()
+
+    def add(self, value, n=1):
+        self.sum += value * n
+        self.n += n
+        self.mean = self.sum / self.n
+
+    def reset(self):
+        self.n = 0
+        self.sum = 0.0
+        self.mean = -1
+
+
 # 得到文件后缀名
 def file_suffix(filename):
     return path.splitext(filename)[-1]
@@ -32,20 +49,12 @@ def weight_init(m):
         m.bias.data.fill_(0)
 
 
+def print_inter_grad(msg):
+    def func(x):
+        print (msg)
+        print (x.norm().item())
+    return func
 
-class Meter():
-    def __init__(self):
-        self.reset()
-
-    def add(self, value, n=1):
-        self.sum += value * n
-        self.n += n
-        self.mean = self.sum / self.n
-
-    def reset(self):
-        self.n = 0
-        self.sum = 0.0
-        self.mean = -1
 
 
 if __name__ == '__main__':
