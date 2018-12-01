@@ -56,6 +56,10 @@ parser.add_argument('--tv_l_w', type=float, default=1, help='the tv loss weight'
 parser.add_argument('--sym_l_w', type=float,default=1, help='the sym loss weight')
 parser.add_argument('--mse_l_w', type=float, default=0.1, help='the rec mse loss weight, size_average=False')
 parser.add_argument('--perp_l_w', type=float, default=0.001, help='the rec perp vgg face loss weight')
+parser.add_argument('--gd_l_w', type=float, default=1, help='the global discriminator for G loss weight')
+parser.add_argument('--ld_l_w', type=float, default=0.5, help='the local discriminator for G loss weight')
+
+
 
 
 
