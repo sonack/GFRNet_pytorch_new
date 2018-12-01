@@ -145,12 +145,12 @@ class Runner(object):
 
             ## GD
             self.GD.zero_grad()
-            
             output = self.GD(real)
+            label.fill_(real_label)
             errGD_D_real = self.GD_crit(output, label)
             errGD_D_real.backward()
-            label.fill_(fake_label)
             output = self.GD(fake.detach())
+            label.fill_(fake_label)
             errGD_D_fake = self.GD_crit(output, label)
             errGD_D_fake.backward()
             errGD_D = (errGD_D_real + errGD_D_fake) / 2
@@ -159,10 +159,11 @@ class Runner(object):
             ## LD
             self.LD.zero_grad()
             output = self.LD(local_real)
+            label.fill_(real_label)
             errLD_D_real = self.LD_crit(output, label)
             errLD_D_real.backward()
-            label.fill_(fake_label)
             output = self.LD(local_fake.detach())
+            label.fill_(fake_label)
             errLD_D_fake = self.LD_crit(output, label)
             errLD_D_fake.backward()
             errLD_D = (errLD_D_real + errLD_D_fake) / 2
