@@ -72,7 +72,9 @@ class VggFaceLoss(nn.Module):
     def forward(self, restored, gt):
         restored_vgg = restored * 255 - self.RGB_mean
         gt_vgg = gt * 255  - self.RGB_mean
-        gt_feat = self.netVgg(gt_vgg)
-        res_feat = self.netVgg(restored_vgg)
+        # RGB->BGR
+        permute = [2, 1, 0]
+        gt_feat = self.netVgg(gt_vgg[:, permute, ...])
+        res_feat = self.netVgg(restored_vgg[:, permute, ...])
         loss = self.criterion(res_feat, gt_feat)
         return loss

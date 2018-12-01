@@ -4,3 +4,7 @@ netVggs/*
 tb_logs/*
 __pycache__
 
+*.tar.gz
+playground/*
+notes/*
+
