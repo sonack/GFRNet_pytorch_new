@@ -9,4 +9,4 @@ __pycache__
 *.tar.gz
 playground/*
 notes/*
-
+*.png

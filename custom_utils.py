@@ -1,3 +1,4 @@
+import os
 from os import path
 import pdb
 import numpy as np
@@ -71,6 +72,11 @@ def make_face_region_batch(imgs, face_regions):
         crop_imgs[batch_id] = F.interpolate(tmp, size=opt.img_size, mode='bilinear', align_corners=True)[0]
     return crop_imgs
 
+
+def make_dir(dir_path):
+    if not path.exists(dir_path):
+        print ('mkdir', dir_path)
+        os.makedirs(dir_path)
 
 if __name__ == '__main__':
     m = Meter()

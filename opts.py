@@ -3,7 +3,6 @@ import os
 from os import path
 import getpass
 import pdb
-
 parser = argparse.ArgumentParser()
 
 
@@ -60,15 +59,23 @@ parser.add_argument('--gd_l_w', type=float, default=1, help='the global discrimi
 parser.add_argument('--ld_l_w', type=float, default=0.5, help='the local discriminator for G loss weight')
 
 
-
-
+# save imgs
+# save blurred test images dir
+parser.add_argument('--sbt_dir', type=str, default="sbt", help='the base dir to save blurred test images')
 
 opt = parser.parse_args()
+
 
 def make_dir(dir_path):
     if not path.exists(dir_path):
         print ('mkdir', dir_path)
         os.makedirs(dir_path)
 
+
 opt.checkpoint_dir = path.join(opt.checkpoint_dir, opt.exp_name)
 make_dir(opt.checkpoint_dir)
+
+opt.sbt_dir = path.join(opt.sbt_dir, opt.exp_name)
+
+
+
