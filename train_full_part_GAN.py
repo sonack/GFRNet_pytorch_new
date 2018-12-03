@@ -26,6 +26,8 @@ import time
 real_label = 1
 fake_label = 0
 
+num = 4
+torch.set_num_threads(num)
 
 class Runner(object):
     def __init__(self):
