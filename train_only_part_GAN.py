@@ -1,4 +1,6 @@
-# uncond global GAN
+# only part gan  uncond 3
+# cond 6 [wg, gt/res]
+
 from __future__ import print_function, division
 from opts import opt
 from tensorboardX import SummaryWriter
@@ -10,7 +12,7 @@ import custom_transforms
 import dataset
 from torch.utils.data import Dataset, DataLoader
 import models
-from custom_utils import weight_init, create_orig_xy_map, Meter, print_inter_grad
+from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch
 
 from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
@@ -45,6 +47,13 @@ class Runner(object):
         if kind == 'global3':
             real = d['gt']
             fake = d['res']
+        elif kind == 'local3':
+            real = make_face_region_batch(d['gt'], d['f_r'])
+            fake = make_face_region_batch(d['res'], d['f_r'])
+        elif kind == 'part3':
+            real = make_parts_region_batch(d['gt'], d['p_p'])
+            fake = make_parts_region_batch(d['res'], d['p_p'])
+
         # pdb.set_trace()
         return real, fake
 
@@ -80,6 +89,12 @@ class Runner(object):
             gt = sb['gt'].to(device)
             lm_mask = sb['lm_mask'].to(device)
             lm_gt = sb['lm_gt'].to(device)
+            f_r = sb['face_region_calc']
+            p_p = sb['part_pos']
+
+
+
+            local_gt = make_face_region_batch(gt, f_r)
 
             w_gd, grid, res = self.G(bl, gd)
 
@@ -97,27 +112,42 @@ class Runner(object):
 
             rec_l = perp_l + mse_l
 
-            # self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter tensor grad"))
-            # res.register_hook(print_inter_grad("rec tensor grad"))
-
             # gan loss
+            ## Global GAN
             d = {
                 'gt': gt,
-                'res': res
+                'res': res,
+                'f_r': f_r,
+                'p_p': p_p,
             }
 
             batch_size = bl.size(0)
             label = torch.full((batch_size,), real_label, device=device)
 
             real, fake = self.prepare_gan_pair_data(d)
-            
             output = self.GD(fake)
             errGD_G = self.GD_crit(output, label)
-
-
             GD_G_l = opt.gd_l_w * errGD_G
 
-            adv_l = GD_G_l
+            ## Local GAN
+            local_real, local_fake = self.prepare_gan_pair_data(d, 'local3')
+            output = self.LD(local_fake)
+            errLD_G = self.LD_crit(output, label)
+            LD_G_l = opt.ld_l_w * errLD_G
+
+            ## Part GAN
+            parts_real, parts_fake = self.prepare_gan_pair_data(d, 'part3')
+
+            errsPD_G = []
+            for p in range(4):
+                output = self.PD[p](parts_fake[p])
+                errsPD_G.append(self.PD_crit[p](output, label))
+
+            PD_G_l = self.parts_l_w[0] * errsPD_G[0] + self.parts_l_w[1] * errsPD_G[1] + self.parts_l_w[2] * errsPD_G[2] + self.parts_l_w[3] * errsPD_G[3]
+
+            # adv_l = LD_G_l
+            adv_l = PD_G_l
+            # adv_l = GD_G_l + LD_G_l
 
             # tot_l = flow_l + rec_l + adv_l
             tot_l = adv_l
@@ -129,20 +159,57 @@ class Runner(object):
 
             # update D
 
+            ## GD
             self.GD.zero_grad()
-            
             output = self.GD(real)
+            label.fill_(real_label)
             errGD_D_real = self.GD_crit(output, label)
             errGD_D_real.backward()
-            label.fill_(fake_label)
             output = self.GD(fake.detach())
+            label.fill_(fake_label)
             errGD_D_fake = self.GD_crit(output, label)
             errGD_D_fake.backward()
             errGD_D = (errGD_D_real + errGD_D_fake) / 2
             self.optimGD.step()
             
-            # logging and printing
+            ## LD
+            self.LD.zero_grad()
+            output = self.LD(local_real)
+            label.fill_(real_label)
+            errLD_D_real = self.LD_crit(output, label)
+            errLD_D_real.backward()
+            output = self.LD(local_fake.detach())
+            label.fill_(fake_label)
+            errLD_D_fake = self.LD_crit(output, label)
+            errLD_D_fake.backward()
+            errLD_D = (errLD_D_real + errLD_D_fake) / 2
+            self.optimLD.step()
 
+            ## PD
+            errsPD_D = []
+            for p in range(4):
+                PD = self.PD[p]
+                optimPD = self.optimPD[p]
+                PD_crit = self.PD_crit[p]
+                part_real = parts_real[p]
+                part_fake = parts_fake[p]
+
+                PD.zero_grad()
+                output = PD(part_real)
+                label.fill_(real_label)
+                errPD_D_real = PD_crit(output, label)
+                errPD_D_real.backward()
+                output = PD(part_fake.detach())
+                label.fill_(fake_label)
+                errPD_D_fake = PD_crit(output, label)
+                errPD_D_fake.backward()
+                errPD_D = (errPD_D_real + errPD_D_fake) / 2
+                errsPD_D.append(errPD_D)
+                optimPD.step()
+
+            PD_D_l = errsPD_D[0] + errsPD_D[1] + errsPD_D[2] + errsPD_D[3]
+
+            # logging and printing
 
             self.ms['pt'].add(pt_l.item())
             self.ms['tv'].add(tv_l.item())
@@ -152,13 +219,17 @@ class Runner(object):
             self.ms['perp'].add(perp_l.item())
             self.ms['GD_G'].add(GD_G_l.item())
             self.ms['GD_D'].add(errGD_D.item())
+            self.ms['LD_G'].add(LD_G_l.item())
+            self.ms['LD_D'].add(errLD_D.item())
+            self.ms['PD_G'].add(PD_G_l.item())
+            for i, p in enumerate(['L', 'R', 'N', 'M']):
+                self.ms['PD_D_%c' % p].add(errsPD_D[i].item())
+            self.ms['PD_D'].add(PD_D_l.item())
 
             self.i_batch_tot += 1
 
             if i_b % opt.print_freq == 0:
-                print ('[Train]: %s [%d/%d] (%d/%d)\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\t\
-                GD Loss: [%.12f/%.12f]\t\
-                Tot Loss=%.12f' % (
+                print ('[Train]: %s [%d/%d] (%d/%d)\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tGD Loss: [%.12f/%.12f]\tLD Loss: [%.12f/%.12f]\tPD Loss: [%.12f/%.12f]\tTot Loss=%.12f' % (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
                     cur_e,
                     opt.max_epoch,
@@ -171,26 +242,33 @@ class Runner(object):
                     self.ms['perp'].mean,
                     self.ms['GD_G'].mean,
                     self.ms['GD_D'].mean,
+                    self.ms['LD_G'].mean,
+                    self.ms['LD_D'].mean,
+                    self.ms['PD_G'].mean,
+                    self.ms['PD_D'].mean,
                     self.ms['tot'].mean,
                     )
                 )
 
             if self.i_batch_tot % opt.disp_freq == 0:
-                self.writer.add_image('train/guide-gt-blur-warp-res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                self.writer.add_image('train/guide-gt-blur-warp-res-local', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_gt[:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt], parts_real[1][:opt.disp_img_cnt], parts_real[2][:opt.disp_img_cnt], parts_real[3][:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                
                 self.writer.add_scalar('train/mse_loss', self.ms['mse'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/perp_loss', self.ms['perp'].mean, self.i_batch_tot)
 
                 self.writer.add_scalar('train/GD/G', self.ms['GD_G'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/GD/D', self.ms['GD_D'].mean, self.i_batch_tot)
-
+                self.writer.add_scalar('train/LD/G', self.ms['LD_G'].mean, self.i_batch_tot)
+                self.writer.add_scalar('train/LD/D', self.ms['LD_D'].mean, self.i_batch_tot)
+                self.writer.add_scalar('train/PD/G', self.ms['PD_G'].mean, self.i_batch_tot)
+                self.writer.add_scalar('train/PD/D', self.ms['PD_D'].mean, self.i_batch_tot)
 
 
                
 
         print ('*' * 30)
-        print ('[Train]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\t\
-        GD Loss: [%.12f/%.12f]\t\
-        Tot Loss=%.12f' % (
+        print ('[Train]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tGD Loss: [%.12f/%.12f]\tLD Loss: [%.12f/%.12f]\tPD Loss: [%.12f/%.12f]\tTot Loss=%.12f' % (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
                     cur_e,
                     opt.max_epoch,
@@ -201,6 +279,10 @@ class Runner(object):
                     self.ms['perp'].mean,
                     self.ms['GD_G'].mean,
                     self.ms['GD_D'].mean,
+                    self.ms['LD_G'].mean,
+                    self.ms['LD_D'].mean,
+                    self.ms['PD_G'].mean,
+                    self.ms['PD_D'].mean,
                     self.ms['tot'].mean,
                     )
                 )
@@ -267,8 +349,6 @@ class Runner(object):
                     self.ms['tot'].mean
                     )
                 )
-
-                self.writer.add_image('test/guide-gt-blur-warp-res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt]], 2), self.i_batch_tot)
         
         print ('=' * 30)
         print ('[Test]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tTot Loss=%.12f' % (
@@ -293,14 +373,10 @@ class Runner(object):
 
     def prepare_losses(self):
         ms = {}
-        ms['sym'] = Meter()
-        ms['pt'] = Meter()
-        ms['tv'] = Meter()
-        ms['mse'] = Meter()
-        ms['perp'] = Meter()
-        ms['tot'] = Meter()
-        ms['GD_G'] = Meter()
-        ms['GD_D'] = Meter()
+        keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D', 'PD_G', 'PD_D', 'PD_D_L', 'PD_D_R', 'PD_D_N', 'PD_D_M']
+
+        for key in keys:
+            ms[key] = Meter()
 
         self.ms = ms
         
@@ -312,12 +388,13 @@ class Runner(object):
         self.perp_crit = VggFaceLoss(3)
         self.perp_crit.to(self.device)
 
-        D_crit = nn.BCELoss
-        if opt.use_LSGAN:
-            D_crit = nn.MSELoss
-        self.GD_crit = D_crit()
 
-        # pdb.set_trace()
+        self.GD_crit = nn.BCELoss()
+        self.LD_crit = nn.BCELoss()
+
+        self.PD_crit = []
+        for p in range(4):
+            self.PD_crit.append(nn.BCELoss())
 
         
 
@@ -328,9 +405,9 @@ class Runner(object):
         if opt.load_checkpoint:
             ckpt = torch.load(opt.load_checkpoint)
             self.G.load_state_dict(ckpt['model'])
-            self.GD.load_state_dict(ckpt['model_GD'])
+            self.LD.load_state_dict(ckpt['model_LD'])
             self.optim.load_state_dict(ckpt['optim'])
-            self.optimGD.load_state_dict(ckpt['optim_GD'])
+            self.optimLD.load_state_dict(ckpt['optim_LD'])
             self.last_epoch = ckpt['epoch']
             self.i_batch_tot = ckpt['i_batch_tot']
             print ('Cont Train from Epoch %2d' % (self.last_epoch + 1))
@@ -348,9 +425,9 @@ class Runner(object):
             'epoch': cur_e,
             'i_batch_tot': self.i_batch_tot,
             'model': self.G.state_dict(),
-            'model_GD': self.GD.state_dict(),
+            'model_LD': self.LD.state_dict(),
             'optim': self.optim.state_dict(),
-            'optim_GD': self.optimGD.state_dict(),
+            'optim_LD': self.optimLD.state_dict(),
         }, ckpt_file)
 
     def change_model_mode(self, train = True):
@@ -365,6 +442,10 @@ class Runner(object):
         betas = (opt.beta1, 0.999)
         self.optim = torch.optim.Adam(self.G.parameters(), lr = opt.lr, betas = betas)
         self.optimGD = torch.optim.Adam(self.GD.parameters(), lr = opt.lr, betas = betas)
+        self.optimLD = torch.optim.Adam(self.LD.parameters(), lr = opt.lr, betas = betas)
+        self.optimPD = []
+        for p in range(4):
+            self.optimPD.append(torch.optim.Adam(self.PD[p].parameters(), lr = opt.lr, betas = betas))
        
 
     def prepare_model(self):
@@ -379,7 +460,24 @@ class Runner(object):
         self.GD.to(self.device)
         self.GD.apply(weight_init)
 
-        self.models = [self.G, self.GD]
+
+        self.LD = models.GFRNet_localDiscriminator(3)
+        self.LD.to(self.device)
+        self.LD.apply(weight_init)
+
+
+        # part Ds
+        # [L, R, N, M]
+
+        self.PD = []
+        for p in range(4):
+            self.PD.append(models.GFRNet_partDiscriminator(3))
+        
+        for pd in self.PD:
+            pd.to(self.device)
+            pd.apply(weight_init)
+        
+        self.models = [self.G, self.GD, self.LD, *self.PD]
 
 
     def prepare_data(self):
@@ -433,6 +531,7 @@ class Runner(object):
         self.last_epoch = -1
         self.i_batch_tot = 0
         self.orig_xy_map = create_orig_xy_map().to(self.device)
+        self.parts_l_w = [opt.pd_L_l_w, opt.pd_R_l_w, opt.pd_N_l_w, opt.pd_M_l_w]
         
 
 

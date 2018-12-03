@@ -213,8 +213,8 @@ class GFRNet_globalDiscriminator(nn.Module):
         # modules.append(nn.Conv2d(ndf*nf_mult, 1, 4, 2))
         modules.append(nn.Conv2d(ndf*nf_mult, ndf*nf_mult, 4, 2))
         modules.append(nn.Conv2d(ndf*nf_mult, 1, 3))
-        # if not opt.use_lsgan:
-        modules.append(nn.Sigmoid())
+        if not opt.use_LSGAN:
+            modules.append(nn.Sigmoid())
 
         self.D = nn.Sequential(*modules)
         # print (self.D)
@@ -254,8 +254,8 @@ class GFRNet_localDiscriminator(nn.Module):
         modules.append(nn.Conv2d(ndf*nf_mult, ndf*nf_mult, 4, 2))
         modules.append(nn.Conv2d(ndf*nf_mult, 1, 3))
 
-        # if not opt.use_lsgan:
-        modules.append(nn.Sigmoid())
+        if not opt.use_LSGAN:
+            modules.append(nn.Sigmoid())
 
         self.D = nn.Sequential(*modules)
     
@@ -263,6 +263,49 @@ class GFRNet_localDiscriminator(nn.Module):
         output = self.D(x)
         return output.view(-1, 1).squeeze(1)
 
+# GAN Part D
+class GFRNet_partDiscriminator(nn.Module):
+    def __init__(self, ch_in):
+        super(GFRNet_partDiscriminator, self).__init__()
+        if opt.part_size == 64:
+            n_layers = 2 
+        elif opt.part_size == 128:
+            n_layers = 3
+         
+        ndf = 64
+
+        modules = []
+        # modules.append(nn.Upsample((256, 256), mode='bilinear'))
+        modules.append(nn.Conv2d(ch_in, ndf, 4, 2, 1))
+        modules.append(nn.LeakyReLU(0.2))
+
+        nf_mult = 1
+        nf_mult_prev = 1
+        for idx in range(1, n_layers):
+            nf_mult_prev = nf_mult
+            nf_mult = min(2**idx, 8)
+            modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
+            modules.append(nn.BatchNorm2d(ndf*nf_mult))
+            modules.append(nn.LeakyReLU(0.2))
+        
+        nf_mult_prev = nf_mult
+        nf_mult = min(2**n_layers, 8)
+        modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
+        modules.append(nn.BatchNorm2d(ndf*nf_mult))
+        modules.append(nn.LeakyReLU(0.2))
+        # 8x8  
+        # modules.append(nn.Conv2d(ndf*nf_mult, 1, 4, 2))
+        modules.append(nn.Conv2d(ndf*nf_mult, ndf*nf_mult, 4, 2))  # 3x3
+        modules.append(nn.Conv2d(ndf*nf_mult, 1, 3))
+        
+        if not opt.use_LSGAN:
+            modules.append(nn.Sigmoid())
+
+        self.D = nn.Sequential(*modules)
+    
+    def forward(self, x):
+        output = self.D(x)
+        return output.view(-1, 1).squeeze(1)
 
 if __name__ == '__main__':
     G = GFRNet_generator()

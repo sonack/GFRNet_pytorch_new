@@ -73,6 +73,23 @@ def make_face_region_batch(imgs, face_regions):
     return crop_imgs
 
 
+def make_parts_region_batch(imgs, part_pos):
+    batch_size = imgs.size(0)
+    parts = [torch.empty(batch_size, 3, opt.part_size, opt.part_size, device=imgs.device) for p in range(4)]
+    for p in range(4):
+        for batch_id in range(batch_size):
+            mid_x = part_pos[batch_id, p, 0]
+            mid_y = part_pos[batch_id, p, 1]
+            half_len = part_pos[batch_id, p, 2] / 2
+            x1 = max(mid_x - half_len, 0)
+            y1 = max(mid_y - half_len, 0)
+            x2 = min(mid_x + half_len, opt.img_size  - 1)
+            y2 = min(mid_y + half_len, opt.img_size  - 1)
+            tmp = imgs[batch_id:batch_id+1,:,y1:y2+1,x1:x2+1]
+            parts[p][batch_id] = F.interpolate(tmp, size=opt.part_size, mode='bilinear', align_corners=True)[0]
+    return parts
+    
+
 def make_dir(dir_path):
     if not path.exists(dir_path):
         print ('mkdir', dir_path)

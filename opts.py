@@ -11,6 +11,7 @@ parser.add_argument('--ngf', type=int, default=64, help='the num of generator(wa
 parser.add_argument('--output_nc', type=int, default=2, help='the num of generator(warpNet) last conv filters (grid channels)')
 parser.add_argument('--img_size', type=int, default=256, help='the image size (current default square)')
 parser.add_argument('--output_nc_img', type=int, default=3, help='the num of generator(recNet) output img channels')
+parser.add_argument('--part_size', type=int, default=64, help='the part size of eyes, nose and mouth (current default square)')
 
 # train
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
@@ -58,10 +59,18 @@ parser.add_argument('--perp_l_w', type=float, default=0.001, help='the rec perp 
 parser.add_argument('--gd_l_w', type=float, default=1, help='the global discriminator for G loss weight')
 parser.add_argument('--ld_l_w', type=float, default=0.5, help='the local discriminator for G loss weight')
 
+parser.add_argument('--pd_L_l_w', type=float, default=1, help='the part left eye discriminator for G loss weight')
+parser.add_argument('--pd_R_l_w', type=float, default=1, help='the part right eye discriminator for G loss weight')
+parser.add_argument('--pd_N_l_w', type=float, default=1, help='the part nose discriminator for G loss weight')
+parser.add_argument('--pd_M_l_w', type=float, default=1, help='the part mouth discriminator for G loss weight')
+
 
 # save imgs
 # save blurred test images dir
 parser.add_argument('--sbt_dir', type=str, default="sbt", help='the base dir to save blurred test images')
+
+parser.add_argument('--use_LSGAN', action='store_true', help='whether to use lsgan, remove sigmoid and replace bceloss with mseloss')
+
 
 opt = parser.parse_args()
 

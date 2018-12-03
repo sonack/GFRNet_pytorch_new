@@ -11,7 +11,7 @@ import custom_transforms
 import dataset
 from torch.utils.data import Dataset, DataLoader
 import models
-from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch
+from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, print_inter_grad
 
 from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
@@ -105,6 +105,10 @@ class Runner(object):
             perp_l = opt.perp_l_w * self.perp_crit(res, gt)
 
             rec_l = perp_l + mse_l
+
+            # self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter tensor grad"))
+            # res.register_hook(print_inter_grad("rec tensor grad"))
+
 
             # gan loss
             ## Global GAN
@@ -338,9 +342,12 @@ class Runner(object):
         self.perp_crit = VggFaceLoss(3)
         self.perp_crit.to(self.device)
 
-
-        self.GD_crit = nn.BCELoss()
-        self.LD_crit = nn.BCELoss()
+        D_crit = nn.BCELoss
+        if opt.use_LSGAN:
+            D_crit = nn.MSELoss
+        
+        self.GD_crit = D_crit()
+        self.LD_crit = D_crit()
 
         
 

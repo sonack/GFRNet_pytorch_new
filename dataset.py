@@ -91,6 +91,26 @@ class FaceDataset(Dataset):
         left_x = POS_INF
         right_x = NEG_INF
 
+
+        p_ids = [
+            list(range(37, 43)),
+            list(range(43, 49)),
+            list(range(28, 37)),
+            list(range(49, 69))
+        ]
+        # L/R flip
+        if self.flip_flag:
+            p_ids[0], p_ids[1] = p_ids[1], p_ids[0]
+
+        p_lens = [len(ids) for ids in p_ids]
+        mid_xs = [0] * 4
+        mid_ys = [0] * 4
+        min_xs = [POS_INF] * 4
+        max_xs = [NEG_INF] * 4
+        min_ys = [POS_INF] * 4
+        max_ys = [NEG_INF] * 4
+        
+
         with open(filename, 'r') as f:
             for idx, line in enumerate(f.readlines(), 1):
                 x1, y1, x2, y2 = list(map(float, line.split()))
@@ -105,7 +125,17 @@ class FaceDataset(Dataset):
                 bottom_y = max(bottom_y, y1)
                 left_x = min(left_x, x1)
                 right_x = max(right_x, x1)
-        
+
+                for p in range(4):
+                    if idx in p_ids[p]:
+                        mid_xs[p] += x1 / p_lens[p]
+                        mid_ys[p] += y1 / p_lens[p]
+                        min_xs[p] = min(min_xs[p], x1)
+                        max_xs[p] = max(max_xs[p], x1)
+                        min_ys[p] = min(min_ys[p], y1)
+                        max_ys[p] = max(max_ys[p], y1)
+
+
                 lm_l.append((x1, y1))
                 lm_r.append((x2, y2))
 
@@ -113,8 +143,19 @@ class FaceDataset(Dataset):
         face_region_y1 = clamp_to_0_255(round(top_y))
         face_region_x2 = clamp_to_0_255(round(right_x))
         face_region_y2 = clamp_to_0_255(round(bottom_y))
+
+        part_pos = []
+        part_expand_mult = [1.2, 1.2, 1.2, 1.2]
+        for p in range(4):
+            part_pos.append(
+                (
+                    clamp_to_0_255(round(mid_xs[p])),
+                    clamp_to_0_255(round(mid_ys[p])),
+                    round(part_expand_mult[p] * max(abs(max_ys[p] - min_ys[p]), abs(max_xs[p] - min_xs[p])))
+                )
+            )
         assert len(lm_l) == 68 and len(lm_l) == len(lm_r), "Landmarks length must be 68!"
-        return lm_l, lm_r, [Point(face_region_x1, face_region_y1), Point(face_region_x2, face_region_y2)]
+        return lm_l, lm_r, [Point(face_region_x1, face_region_y1), Point(face_region_x2, face_region_y2)], part_pos
 
     # sym axis is calc by [-1, 1] coords, and y is up increasing which is opposite to array index direction.
     # sym axis is unit vector
@@ -199,7 +240,7 @@ class FaceDataset(Dataset):
         # if self.sym_dir is None, then do not use sym info
         if self.landmark_dir:
             lm_file = path.join(self.landmark_dir, file_id_name)
-            lm_l, lm_r, face_region_calc = self.parse_landmark_file(lm_file)
+            lm_l, lm_r, face_region_calc, part_pos = self.parse_landmark_file(lm_file)
             landmark_left = np.array(lm_l, dtype=np.float32)
             landmark_right = np.array(lm_r, dtype=np.float32)
 
@@ -222,6 +263,7 @@ class FaceDataset(Dataset):
         }
 
         if self.landmark_dir:
+            sample['part_pos'] = np.array(part_pos, dtype=np.int32)
             sample['face_region_calc'] = face_region_calc
             sample['lm_gt'] = lm_gt
             sample['lm_mask'] = lm_mask
@@ -244,21 +286,28 @@ def test():
     # sym_dir = 'DataSets/Original/Sym_bz'
     face_dataset = FaceDataset(img_dir, landmark_dir, sym_dir, -1, None, False)
 
-    face_dataset = FaceDataset(img_dir, test_mode=True)
+    # face_dataset = FaceDataset(img_dir, test_mode=True)
     
     print ('Dataset size:', len(face_dataset))
 
-    idx = 1
+    idx = 1224
 
     sample = face_dataset[idx]
-    face_region = sample['face_region']
+    face_region = sample['face_region_calc']
+
+    part_pos = sample['part_pos']
     # face_region_calc = sample['face_region_calc']
     print (face_region)
+    print (part_pos)
+
+    # pdb.set_trace()
     # print (face_region_calc)
 
     p1, p2 = face_region
     w = p2.x - p1.x
     h = p2.y - p1.y
+
+
 
     fig, ax = plt.subplots(1,1)
     # 左上角坐标 (宽,高)
@@ -266,6 +315,11 @@ def test():
     rect = patches.Rectangle((p1.x,p1.y),w,h,linewidth=1,edgecolor='green',facecolor='none')
     ax.add_patch(rect)
     
+    colors = ['r', 'g' , 'w', 'b', 'blue', 'pink', 'purple', 'y']
+    for p in range(4):
+        L = sample['part_pos'][p]
+        rect = patches.Rectangle((L[0] - L[2]/2, L[1] - L[2]/2),L[2],L[2],linewidth=1,edgecolor=random.choice(colors),facecolor='none')
+        ax.add_patch(rect)
     # lm_l = sample['lm_l']
 
     # ax.scatter([50,30],[50,200], s=20, c='blue', marker='o')
