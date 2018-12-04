@@ -26,6 +26,9 @@ import time
 real_label = 1
 fake_label = 0
 
+num = 4
+torch.set_num_threads(num)
+
 def noisy_real_label():
     return random.randint(7, 12) / 10
 
