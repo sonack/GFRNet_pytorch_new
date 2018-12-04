@@ -539,8 +539,8 @@ class Runner(object):
 
 
     def prepare_data(self):
-        train_degradation_tsfm = custom_transforms.DegradationModel()
-        test_degradation_tsfm = custom_transforms.DegradationModel()
+        train_degradation_tsfm = custom_transforms.DegradationModel(opt.kind)
+        test_degradation_tsfm = custom_transforms.DegradationModel(opt.kind)
         # train_degradation_tsfm = custom_transforms.DegradationModel("train degradation")
         # test_degradation_tsfm = custom_transforms.DegradationModel("test degradation")
         to_tensor_tsfm = custom_transforms.ToTensor()

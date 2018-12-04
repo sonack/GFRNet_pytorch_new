@@ -114,6 +114,7 @@ class DegradationModel(object):
             self.downsample_scale_list = [4]
             self.awgn_level_list = [0]
             self.jpeg_quality_list = [0]
+
         elif kind == 'weaker_1':   # 0.5 trigger prob
             self.gaussianBlur_sigma_list = [1 + x for x in range(3)]
             self.gaussianBlur_sigma_list += int(len(self.gaussianBlur_sigma_list)) * [0] # 1/2 trigger this degradation
@@ -126,6 +127,7 @@ class DegradationModel(object):
             
             self.jpeg_quality_list = list(range(10, 41, 1))
             self.jpeg_quality_list += int(len(self.jpeg_quality_list)) * [0]
+
         elif kind == 'weaker_2':    # weaker than weaker_1, jpeg [20,40]
             self.gaussianBlur_sigma_list = [1 + x for x in range(3)]
             self.gaussianBlur_sigma_list += int(len(self.gaussianBlur_sigma_list)) * [0] # 1/2 trigger this degradation
