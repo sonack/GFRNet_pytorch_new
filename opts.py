@@ -68,6 +68,7 @@ parser.add_argument('--pd_M_l_w', type=float, default=1, help='the part mouth di
 # save imgs
 # save blurred test images dir
 parser.add_argument('--sbt_dir', type=str, default="sbt", help='the base dir to save blurred test images')
+parser.add_argument('--kind', type=str, default="original", help='the degradation kind of test tsfm to save blurred test images')
 
 parser.add_argument('--use_LSGAN', action='store_true', help='whether to use lsgan, remove sigmoid and replace bceloss with mseloss')
 

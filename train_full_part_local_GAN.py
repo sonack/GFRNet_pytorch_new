@@ -1,6 +1,6 @@
 # only part gan  uncond 3
 # cond 6 [wg, gt/res]
-
+# local + part
 from __future__ import print_function, division
 from opts import opt
 from tensorboardX import SummaryWriter
@@ -25,9 +25,6 @@ import time
 
 real_label = 1
 fake_label = 0
-
-num = 4
-torch.set_num_threads(num)
 
 def noisy_real_label():
     return random.randint(7, 12) / 10
@@ -159,7 +156,7 @@ class Runner(object):
 
             # adv_l = LD_G_l
             # adv_l = PD_G_l
-            adv_l = GD_G_l + PD_G_l
+            adv_l = GD_G_l + PD_G_l + LD_G_l
             # adv_l = GD_G_l + LD_G_l
 
             tot_l = flow_l + rec_l + adv_l
@@ -432,23 +429,24 @@ class Runner(object):
             ckpt = torch.load(opt.load_checkpoint)
             self.G.load_state_dict(ckpt['model'])
             if 'model_GD' in ckpt:
-                # self.GD.load_state_dict(ckpt['model_GD'])
-                pass
+                self.GD.load_state_dict(ckpt['model_GD'])
+                # pass
             if 'model_LD' in ckpt:
-                print ('model_LD!!')
+                # print ('model_LD!!')
                 self.LD.load_state_dict(ckpt['model_LD'])
             if 'model_PD_L' in ckpt:
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
-                    # self.PD[i].load_state_dict(ckpt['model_PD_%c' % p])
-                    pass
+                    self.PD[i].load_state_dict(ckpt['model_PD_%c' % p])
+                    # pass
             
             # self.optim.load_state_dict(ckpt['optim'])
             if 'optim_GD' in ckpt:
                 # self.optimGD.load_state_dict(ckpt['optim_GD'])
                 pass
             if 'optim_LD' in ckpt:
-                print ('optim_LD!!')
-                self.optimLD.load_state_dict(ckpt['optim_LD'])
+                # print ('optim_LD!!')
+                # self.optimLD.load_state_dict(ckpt['optim_LD'])
+                pass
             if 'optim_PD_L' in ckpt:
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
                     # self.optimPD[i].load_state_dict(ckpt['optim_PD_%c' % p])
@@ -472,10 +470,10 @@ class Runner(object):
             'i_batch_tot': self.i_batch_tot,
             'model': self.G.state_dict(),
             'model_GD': self.GD.state_dict(),
-            # 'model_LD': self.LD.state_dict(),
+            'model_LD': self.LD.state_dict(),
             'optim': self.optim.state_dict(),
             'optim_GD': self.optimGD.state_dict(),
-            # 'optim_LD': self.optimLD.state_dict(),
+            'optim_LD': self.optimLD.state_dict(),
         }
         for i, p in enumerate(['L', 'R', 'N', 'M']):
             ckpt_dict['model_PD_%c' % p] = self.PD[i].state_dict()
