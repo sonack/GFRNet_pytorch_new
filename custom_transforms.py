@@ -81,28 +81,71 @@ class JPEGCompressor(object):
             sample['blur'] = cv2.imdecode(cv2.imencode('.jpg', sample['blur'], encode_param)[1], 1)
         return sample
 
-
 class DegradationModel(object):
-    def __init__(self, msg = None):
-        # self.msg = msg
+
+    def degradation_kind(self, kind = 'original'):
+        if kind == 'original':
+            # self.msg = msg
+
+            # self.gaussianBlur_sigma_list = [1 + x * 0.1 for x in range(21)]
+            self.gaussianBlur_sigma_list = [1 + x for x in range(3)]
+            
+            self.gaussianBlur_sigma_list += [0]
+            # self.gaussianBlur_sigma_list += int(len(self.gaussianBlur_sigma_list)) * [0] # 1/2 trigger this degradation
+            
+            self.downsample_scale_list = [1 + x * 0.1 for x in range(0,71)]
+            # self.downsample_scale_list += int(len(self.downsample_scale_list)) * [1]
+            
+            self.awgn_level_list = list(range(1, 8, 1))
+            # self.awgn_level_list += int(len(self.awgn_level_list)) * [0]
+            
+            self.jpeg_quality_list = list(range(10, 41, 1))
+            self.jpeg_quality_list += int(len(self.jpeg_quality_list) * 0.33) * [0]
+        
+        elif kind == 'only_downsample':
+            self.gaussianBlur_sigma_list = [0]
+            self.downsample_scale_list = [1 + x * 0.1 for x in range(0,71)]
+            self.awgn_level_list = [0]
+            self.jpeg_quality_list = [0]
+
+        elif kind == 'only_4x':
+            self.gaussianBlur_sigma_list = [0]
+            # self.downsample_scale_list = [1 + x * 0.1 for x in range(0,71)]
+            self.downsample_scale_list = [4]
+            self.awgn_level_list = [0]
+            self.jpeg_quality_list = [0]
+        elif kind == 'weaker_1':   # 0.5 trigger prob
+            self.gaussianBlur_sigma_list = [1 + x for x in range(3)]
+            self.gaussianBlur_sigma_list += int(len(self.gaussianBlur_sigma_list)) * [0] # 1/2 trigger this degradation
+            
+            self.downsample_scale_list = [1 + x * 0.1 for x in range(0,71)]
+            self.downsample_scale_list += int(len(self.downsample_scale_list)) * [1]
+            
+            self.awgn_level_list = list(range(1, 8, 1))
+            self.awgn_level_list += int(len(self.awgn_level_list)) * [0]
+            
+            self.jpeg_quality_list = list(range(10, 41, 1))
+            self.jpeg_quality_list += int(len(self.jpeg_quality_list)) * [0]
+        elif kind == 'weaker_2':    # weaker than weaker_1, jpeg [20,40]
+            self.gaussianBlur_sigma_list = [1 + x for x in range(3)]
+            self.gaussianBlur_sigma_list += int(len(self.gaussianBlur_sigma_list)) * [0] # 1/2 trigger this degradation
+            
+            self.downsample_scale_list = [1 + x * 0.1 for x in range(0,71)]
+            self.downsample_scale_list += int(len(self.downsample_scale_list)) * [1]
+            
+            self.awgn_level_list = list(range(1, 8, 1))
+            self.awgn_level_list += int(len(self.awgn_level_list)) * [0]
+            
+            self.jpeg_quality_list = list(range(20, 41, 1))
+            self.jpeg_quality_list += int(len(self.jpeg_quality_list)) * [0]
+
+
+        
+    def __init__(self, kind = 'original', msg = None):
+       
         self.gaussianBlur_size_list = list(range(3,14,2))
 
-        # self.gaussianBlur_sigma_list = [1 + x * 0.1 for x in range(21)]
-        self.gaussianBlur_sigma_list = [1 + x for x in range(3)]
-        
-        self.gaussianBlur_sigma_list += [0]
-        # self.gaussianBlur_sigma_list += int(len(self.gaussianBlur_sigma_list)) * [0] # 1/2 trigger this degradation
-        
-        self.downsample_scale_list = [1 + x * 0.1 for x in range(0,71)]
-        # self.downsample_scale_list += int(len(self.downsample_scale_list)) * [1]
-        
-        self.awgn_level_list = list(range(1, 8, 1))
-        # self.awgn_level_list += int(len(self.awgn_level_list)) * [0]
-        
-        self.jpeg_quality_list = list(range(10, 41, 1))
-        self.jpeg_quality_list += int(len(self.jpeg_quality_list) * 0.33) * [0]
-
-
+        self.degradation_kind(kind)
 
 
         # ops

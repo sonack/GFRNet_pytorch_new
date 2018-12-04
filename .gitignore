@@ -10,3 +10,4 @@ __pycache__
 playground/*
 notes/*
 *.png
+tools/*
