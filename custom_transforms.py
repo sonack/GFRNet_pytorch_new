@@ -10,7 +10,12 @@ class ToTensor(object):
     def __init__(self):
         self.to_tensor = transforms.ToTensor()
     def __call__(self, sample):
-        sample['gt'], sample['blur'], sample['guide'] = self.to_tensor(sample['gt']), self.to_tensor(sample['blur']), self.to_tensor(sample['guide'])
+        if 'gt' in sample:
+            sample['gt'] = self.to_tensor(sample['gt'])
+        if 'blur' in sample:
+            sample['blur'] = self.to_tensor(sample['blur'])
+        if 'guide' in sample:
+            sample['guide'] = self.to_tensor(sample['guide'])
         return sample
 
 

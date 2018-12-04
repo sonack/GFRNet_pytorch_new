@@ -38,6 +38,37 @@ NEG_INF = - POS_INF
 
 Point = namedtuple('Point', ['x', 'y'])
 
+# br, gd, img_path
+class LoadFaceDataset(Dataset):
+    def __init__(self, img_dir = None, transform = None):
+        self.img_dir = img_dir
+        self.transform = transform
+        self._img_list = []
+
+        for filename in os.listdir(self.img_dir):
+            full_filename = path.join(self.img_dir, filename)
+            if path.isfile(full_filename) and (file_suffix(filename) in img_suffixes):
+                self._img_list.append(filename)
+    
+    def __len__(self):
+        return len(self._img_list)
+
+    def __getitem__(self, idx):
+        img_filename = path.join(self.img_dir, self._img_list[idx])
+        image = cv2.imread(img_filename)
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        wd = int(image.shape[1] // 2)
+        left = image[:,:wd,:]
+        right = image[:,wd:,:]
+        sample = {
+            'blur': left,
+            'guide': right,
+            'img_path': img_filename,
+        }
+        if self.transform:
+            sample = self.transform(sample)
+        return sample
+
 class FaceDataset(Dataset):
     def __init__(self, img_dir = None, landmark_dir = None, sym_dir = None, flip_prob = 0.5, transform = None, test_mode = False):
         assert not (img_dir is None), "img_dir is None!"
@@ -333,5 +364,16 @@ def test():
 
     plt.savefig('result')
 
+def test_load_dataset():
+    load_dataset = LoadFaceDataset("./sbt/sb_7", None)
+    idx = 1
+    sample = load_dataset[idx]
+    print (sample['img_path'])
+
+    fig, ax = plt.subplots(1,1)
+    ax.imshow(sample['blur'])
+    plt.savefig('load_result')
+
 if __name__ == '__main__':
-    test()
+    # test()
+    test_load_dataset()

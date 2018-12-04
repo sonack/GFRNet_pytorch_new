@@ -1,6 +1,5 @@
-# only part gan  uncond 3
-# cond 6 [wg, gt/res]
-# local + part
+# uncond local GAN
+
 from __future__ import print_function, division
 from opts import opt
 from tensorboardX import SummaryWriter
@@ -12,28 +11,20 @@ import custom_transforms
 import dataset
 from torch.utils.data import Dataset, DataLoader
 import models
-from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch
+from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_dir
 
 from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
 from os import path
 from torchvision import transforms
+from torchvision.utils import save_image
 import pdb
 import time
-
+from tqdm import tqdm
 
 
 real_label = 1
 fake_label = 0
-
-# num = 4
-# torch.set_num_threads(num)
-
-def noisy_real_label():
-    return random.randint(7, 12) / 10
-
-def noisy_fake_label():
-    return random.randint(0, 3) / 10
 
 
 class Runner(object):
@@ -59,21 +50,13 @@ class Runner(object):
         elif kind == 'local3':
             real = make_face_region_batch(d['gt'], d['f_r'])
             fake = make_face_region_batch(d['res'], d['f_r'])
-        elif kind == 'part3':
-            real = make_parts_region_batch(d['gt'], d['p_p'])
-            fake = make_parts_region_batch(d['res'], d['p_p'])
 
         # pdb.set_trace()
         return real, fake
 
     def run(self):
         for e in range(self.last_epoch + 1, opt.max_epoch):
-            self.change_model_mode(True)
-            self.reset_ms()
             self.train_one_epoch(e)
-
-            self.change_model_mode(False)
-            self.reset_ms()
             self.test(e)
             
             if (e + 1) % opt.save_epoch_freq == 0:
@@ -89,6 +72,8 @@ class Runner(object):
 
     # one epoch train
     def train_one_epoch(self, cur_e = 0):
+        self.change_model_mode(True)
+        self.reset_ms()
         device = self.device
         for i_b, sb in enumerate(self.train_dl):
             # if i_b > 100:
@@ -99,9 +84,9 @@ class Runner(object):
             lm_mask = sb['lm_mask'].to(device)
             lm_gt = sb['lm_gt'].to(device)
             f_r = sb['face_region_calc']
-            p_p = sb['part_pos']
 
-            # local_gt = make_face_region_batch(gt, f_r)
+
+            local_gt = make_face_region_batch(gt, f_r)
 
             w_gd, grid, res = self.G(bl, gd)
 
@@ -125,13 +110,13 @@ class Runner(object):
                 'gt': gt,
                 'res': res,
                 'f_r': f_r,
-                'p_p': p_p,
             }
 
             batch_size = bl.size(0)
             label = torch.full((batch_size,), real_label, device=device)
 
             real, fake = self.prepare_gan_pair_data(d)
+            
             output = self.GD(fake)
             errGD_G = self.GD_crit(output, label)
             GD_G_l = opt.gd_l_w * errGD_G
@@ -141,24 +126,10 @@ class Runner(object):
             output = self.LD(local_fake)
             errLD_G = self.LD_crit(output, label)
             LD_G_l = opt.ld_l_w * errLD_G
-
-            # pdb.set_trace()
-
-
-            ## Part GAN
-            parts_real, parts_fake = self.prepare_gan_pair_data(d, 'part3')
-
-            errsPD_G = []
-            for p in range(4):
-                output = self.PD[p](parts_fake[p])
-                errsPD_G.append(self.PD_crit[p](output, label))
-
-            PD_G_l = self.parts_l_w[0] * errsPD_G[0] + self.parts_l_w[1] * errsPD_G[1] + self.parts_l_w[2] * errsPD_G[2] + self.parts_l_w[3] * errsPD_G[3]
+            
 
             # adv_l = LD_G_l
-            # adv_l = PD_G_l
-            adv_l = GD_G_l + PD_G_l + LD_G_l
-            # adv_l = GD_G_l + LD_G_l
+            adv_l = GD_G_l + LD_G_l
 
             tot_l = flow_l + rec_l + adv_l
             # tot_l = adv_l
@@ -173,13 +144,11 @@ class Runner(object):
             ## GD
             self.GD.zero_grad()
             output = self.GD(real)
-            # label.fill_(real_label)
-            label = torch.full_like(label, noisy_real_label())
+            label.fill_(real_label)
             errGD_D_real = self.GD_crit(output, label)
             errGD_D_real.backward()
             output = self.GD(fake.detach())
-            # label.fill_(fake_label)
-            label = torch.full_like(label, noisy_fake_label())
+            label.fill_(fake_label)
             errGD_D_fake = self.GD_crit(output, label)
             errGD_D_fake.backward()
             errGD_D = (errGD_D_real + errGD_D_fake) / 2
@@ -188,46 +157,15 @@ class Runner(object):
             ## LD
             self.LD.zero_grad()
             output = self.LD(local_real)
-            # label.fill_(real_label)
-            label = torch.full_like(label, noisy_real_label())
+            label.fill_(real_label)
             errLD_D_real = self.LD_crit(output, label)
             errLD_D_real.backward()
             output = self.LD(local_fake.detach())
-            # label.fill_(fake_label)
-            label = torch.full_like(label, noisy_fake_label())
+            label.fill_(fake_label)
             errLD_D_fake = self.LD_crit(output, label)
             errLD_D_fake.backward()
             errLD_D = (errLD_D_real + errLD_D_fake) / 2
-
-            # pdb.set_trace()
-
             self.optimLD.step()
-
-            ## PD
-            errsPD_D = []
-            for p in range(4):
-                PD = self.PD[p]
-                optimPD = self.optimPD[p]
-                PD_crit = self.PD_crit[p]
-                part_real = parts_real[p]
-                part_fake = parts_fake[p]
-
-                PD.zero_grad()
-                output = PD(part_real)
-                # label.fill_(real_label)
-                label = torch.full_like(label, noisy_real_label())
-                errPD_D_real = PD_crit(output, label)
-                errPD_D_real.backward()
-                output = PD(part_fake.detach())
-                # label.fill_(fake_label)
-                label = torch.full_like(label, noisy_fake_label())
-                errPD_D_fake = PD_crit(output, label)
-                errPD_D_fake.backward()
-                errPD_D = (errPD_D_real + errPD_D_fake) / 2
-                errsPD_D.append(errPD_D)
-                optimPD.step()
-
-            PD_D_l = errsPD_D[0] + errsPD_D[1] + errsPD_D[2] + errsPD_D[3]
 
             # logging and printing
 
@@ -241,15 +179,11 @@ class Runner(object):
             self.ms['GD_D'].add(errGD_D.item())
             self.ms['LD_G'].add(LD_G_l.item())
             self.ms['LD_D'].add(errLD_D.item())
-            self.ms['PD_G'].add(PD_G_l.item())
-            for i, p in enumerate(['L', 'R', 'N', 'M']):
-                self.ms['PD_D_%c' % p].add(errsPD_D[i].item())
-            self.ms['PD_D'].add(PD_D_l.item())
 
             self.i_batch_tot += 1
 
             if i_b % opt.print_freq == 0:
-                print ('[Train]: %s [%d/%d] (%d/%d)\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tGD Loss: [%.12f/%.12f]\tLD Loss: [%.12f/%.12f]\tPD Loss: [%.12f/%.12f]\tTot Loss=%.12f' % (
+                print ('[Train]: %s [%d/%d] (%d/%d)\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tGD Loss: [%.12f/%.12f]\tLD Loss: [%.12f/%.12f]\tTot Loss=%.12f' % (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
                     cur_e,
                     opt.max_epoch,
@@ -264,15 +198,12 @@ class Runner(object):
                     self.ms['GD_D'].mean,
                     self.ms['LD_G'].mean,
                     self.ms['LD_D'].mean,
-                    self.ms['PD_G'].mean,
-                    self.ms['PD_D'].mean,
                     self.ms['tot'].mean,
                     )
                 )
 
             if self.i_batch_tot % opt.disp_freq == 0:
-                self.writer.add_image('train/guide-gt-blur-warp-res-local_gt-local_res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_real[:opt.disp_img_cnt], local_fake[:opt.disp_img_cnt]], 2), self.i_batch_tot)
-                # self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt], parts_real[1][:opt.disp_img_cnt], parts_real[2][:opt.disp_img_cnt], parts_real[3][:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                self.writer.add_image('train/guide-gt-blur-warp-res-local', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_gt[:opt.disp_img_cnt]], 2), self.i_batch_tot)
                 
                 self.writer.add_scalar('train/mse_loss', self.ms['mse'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/perp_loss', self.ms['perp'].mean, self.i_batch_tot)
@@ -281,18 +212,17 @@ class Runner(object):
                 self.writer.add_scalar('train/GD/D', self.ms['GD_D'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/LD/G', self.ms['LD_G'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/LD/D', self.ms['LD_D'].mean, self.i_batch_tot)
-                self.writer.add_scalar('train/PD/G', self.ms['PD_G'].mean, self.i_batch_tot)
-                self.writer.add_scalar('train/PD/D', self.ms['PD_D'].mean, self.i_batch_tot)
 
                 self.writer.add_scalar('train/pt_loss', self.ms['pt'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/tv_loss', self.ms['tv'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/sym_loss', self.ms['sym'].mean, self.i_batch_tot)
+                
 
 
                
-
+        # epoch level loss info
         print ('*' * 30)
-        print ('[Train]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tGD Loss: [%.12f/%.12f]\tLD Loss: [%.12f/%.12f]\tPD Loss: [%.12f/%.12f]\tTot Loss=%.12f' % (
+        print ('[Train]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tGD Loss: [%.12f/%.12f]\tLD Loss: [%.12f/%.12f]\tTot Loss=%.12f' % (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
                     cur_e,
                     opt.max_epoch,
@@ -305,8 +235,6 @@ class Runner(object):
                     self.ms['GD_D'].mean,
                     self.ms['LD_G'].mean,
                     self.ms['LD_D'].mean,
-                    self.ms['PD_G'].mean,
-                    self.ms['PD_D'].mean,
                     self.ms['tot'].mean,
                     )
                 )
@@ -317,7 +245,42 @@ class Runner(object):
         
 
 
+    def save_blurred_imgs(self):
+        # device = self.device
+        make_dir(opt.sbt_dir)
+        for i_b, sb in tqdm(enumerate(self.test_dl)):
+            # if i_b > 10:
+            #     break
+        
+            bl = sb['blur']
+            gd = sb['guide']
+            fn = list(map(path.basename, sb['img_path']))
+            n_fn = [path.join(opt.sbt_dir, f_name) for f_name in fn]
+            # pdb.set_trace()
+            bs = gd.size(0)
+
+            for b_id in tqdm(range(bs)):
+                save_image(torch.cat([bl[b_id, ...], gd[b_id, ...]], 0).view(2, 3, opt.img_size, opt.img_size), n_fn[b_id], padding = 0)
+            
+    def save_test_results(self):
+        self.change_model_mode(False)
+        device = self.device
+        make_dir(opt.str_dir)
+        for i_b, sb in tqdm(enumerate(self.load_dl)):
+            with torch.no_grad():
+                gd = sb['guide'].to(device)
+                bl = sb['blur'].to(device)
+                fn = list(map(path.basename, sb['img_path']))
+                n_fn = [path.join(opt.str_dir, f_name) for f_name in fn]
+                w_gd, grid, res = self.G(bl, gd)
+                bs = gd.size(0)
+                for b_id in tqdm(range(bs)):
+                    save_image(res[b_id].view(1, 3, opt.img_size, opt.img_size), n_fn[b_id], padding = 0)
+
+        
     def test(self, cur_e = 0):
+        self.change_model_mode(False)
+        self.reset_ms()
         device = self.device
         for i_b, sb in enumerate(self.test_dl):
             with torch.no_grad():
@@ -346,7 +309,8 @@ class Runner(object):
                 perp_l = opt.perp_l_w * self.perp_crit(res, gt)
 
                 # rec_l = mse_l
-                rec_l = perp_l
+                # rec_l = perp_l
+                rec_l = mse_l + perp_l
 
                 tot_l = flow_l + rec_l
 
@@ -375,6 +339,7 @@ class Runner(object):
                 )
 
                 self.writer.add_image('test/guide-gt-blur-warp-res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt]], 2), self.i_batch_tot)
+
         
         print ('=' * 30)
         print ('[Test]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tTot Loss=%.12f' % (
@@ -399,7 +364,7 @@ class Runner(object):
 
     def prepare_losses(self):
         ms = {}
-        keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D', 'PD_G', 'PD_D', 'PD_D_L', 'PD_D_R', 'PD_D_N', 'PD_D_M']
+        keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D']
 
         for key in keys:
             ms[key] = Meter()
@@ -418,11 +383,9 @@ class Runner(object):
         self.GD_crit = nn.BCELoss()
         self.LD_crit = nn.BCELoss()
 
-        self.PD_crit = []
-        for p in range(4):
-            self.PD_crit.append(nn.BCELoss())
-
         
+
+
     def load_checkpoint(self):
         if not (opt.load_checkpoint or opt.load_warpnet):
             return
@@ -431,31 +394,17 @@ class Runner(object):
             self.G.load_state_dict(ckpt['model'])
             if 'model_GD' in ckpt:
                 self.GD.load_state_dict(ckpt['model_GD'])
-                # pass
             if 'model_LD' in ckpt:
-                # print ('model_LD!!')
                 self.LD.load_state_dict(ckpt['model_LD'])
-            if 'model_PD_L' in ckpt:
-                for i, p in enumerate(['L', 'R', 'N', 'M']):
-                    self.PD[i].load_state_dict(ckpt['model_PD_%c' % p])
-                    # pass
-            
             # self.optim.load_state_dict(ckpt['optim'])
             if 'optim_GD' in ckpt:
-                # self.optimGD.load_state_dict(ckpt['optim_GD'])
-                pass
+                self.optimGD.load_state_dict(ckpt['optim_GD'])
             if 'optim_LD' in ckpt:
-                # print ('optim_LD!!')
-                # self.optimLD.load_state_dict(ckpt['optim_LD'])
-                pass
-            if 'optim_PD_L' in ckpt:
-                for i, p in enumerate(['L', 'R', 'N', 'M']):
-                    # self.optimPD[i].load_state_dict(ckpt['optim_PD_%c' % p])
-                    pass
-            
+                self.optimLD.load_state_dict(ckpt['optim_LD'])
             self.last_epoch = ckpt['epoch']
             self.i_batch_tot = ckpt['i_batch_tot']
             print ('Cont Train from Epoch %2d' % (self.last_epoch + 1))
+
         if opt.load_warpnet:
             ckpt = torch.load(opt.load_warpnet)
             self.G.warpNet.load_state_dict(ckpt['model'])
@@ -466,7 +415,7 @@ class Runner(object):
         ckpt_file = path.join(opt.checkpoint_dir, 'ckpt_%03d.pt' % (cur_e + 1))
 
         print ('Save Model to %s ... ' % ckpt_file)
-        ckpt_dict = {
+        torch.save({
             'epoch': cur_e,
             'i_batch_tot': self.i_batch_tot,
             'model': self.G.state_dict(),
@@ -475,12 +424,7 @@ class Runner(object):
             'optim': self.optim.state_dict(),
             'optim_GD': self.optimGD.state_dict(),
             'optim_LD': self.optimLD.state_dict(),
-        }
-        for i, p in enumerate(['L', 'R', 'N', 'M']):
-            ckpt_dict['model_PD_%c' % p] = self.PD[i].state_dict()
-            ckpt_dict['optim_PD_%c' % p] = self.optimPD[i].state_dict()
-        
-        torch.save(ckpt_dict, ckpt_file)
+        }, ckpt_file)
 
     def change_model_mode(self, train = True):
         if train:
@@ -492,6 +436,7 @@ class Runner(object):
 
     def prepare_optim(self):
         betas = (opt.beta1, 0.999)
+        # self.optim = torch.optim.Adam(self.G.parameters(), lr = opt.lr, betas = betas)
         self.optim = torch.optim.Adam(
             [
                 { 'params': self.G.warpNet.parameters(), 'lr': opt.lr * 0.001 },
@@ -502,9 +447,6 @@ class Runner(object):
         )
         self.optimGD = torch.optim.Adam(self.GD.parameters(), lr = opt.lr, betas = betas)
         self.optimLD = torch.optim.Adam(self.LD.parameters(), lr = opt.lr, betas = betas)
-        self.optimPD = []
-        for p in range(4):
-            self.optimPD.append(torch.optim.Adam(self.PD[p].parameters(), lr = opt.lr, betas = betas))
        
 
     def prepare_model(self):
@@ -524,19 +466,7 @@ class Runner(object):
         self.LD.to(self.device)
         self.LD.apply(weight_init)
 
-
-        # part Ds
-        # [L, R, N, M]
-
-        self.PD = []
-        for p in range(4):
-            self.PD.append(models.GFRNet_partDiscriminator(3))
-        
-        for pd in self.PD:
-            pd.to(self.device)
-            pd.apply(weight_init)
-        
-        self.models = [self.G, self.GD, self.LD, *self.PD]
+        self.models = [self.G, self.GD, self.LD]
 
 
     def prepare_data(self):
@@ -555,6 +485,7 @@ class Runner(object):
         ]
         train_tsfm_c = transforms.Compose(train_tsfms)
         test_tsfm_c = transforms.Compose(test_tsfms)
+        load_tsfm_c = to_tensor_tsfm
         
         self.train_dataset = dataset.FaceDataset(opt.train_img_dir, opt.train_landmark_dir, opt.train_sym_dir, opt.flip_prob, train_tsfm_c, False)
         self.train_dl = DataLoader(self.train_dataset, batch_size = opt.batch_size, shuffle = True, num_workers = opt.num_workers)
@@ -563,6 +494,15 @@ class Runner(object):
         self.test_dataset = dataset.FaceDataset(opt.test_img_dir, opt.test_landmark_dir, opt.test_sym_dir, -1, test_tsfm_c, True)
         self.test_dl = DataLoader(self.test_dataset, batch_size = opt.batch_size, shuffle = False, num_workers = opt.num_workers)
         self.test_BNPE = len(self.test_dl)
+
+        if opt.load_sbt_dir:
+            self.load_dataset = dataset.LoadFaceDataset(opt.load_sbt_dir, load_tsfm_c)
+            self.load_dl = DataLoader(self.load_dataset, batch_size = opt.batch_size, shuffle = False, num_workers = opt.num_workers)
+            self.load_BNPE = len(self.load_dl)
+        else:
+            self.load_dataset = self.test_dataset
+            self.load_dl = self.test_dl
+            self.load_BNPE = self.test_BNPE
 
     def startup(self):
         # random seed
@@ -590,10 +530,11 @@ class Runner(object):
         self.last_epoch = -1
         self.i_batch_tot = 0
         self.orig_xy_map = create_orig_xy_map().to(self.device)
-        self.parts_l_w = [opt.pd_L_l_w, opt.pd_R_l_w, opt.pd_N_l_w, opt.pd_M_l_w]
         
 
 
 runner = Runner()
-runner.run()
+# runner.run()
+# runner.save_blurred_imgs()
+runner.save_test_results()
 
