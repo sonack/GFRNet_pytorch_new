@@ -85,7 +85,25 @@ parser.add_argument('--PD_cond', type=int, default=3, help='3: uncond, 6: [w_gd,
 
 
 
+parser.add_argument('--hpc_version', action='store_true', help='use on HPC servers')
+
+
 opt = parser.parse_args()
+
+
+user_name = getpass.getuser()
+if user_name == 'zhangwenqiang':
+    opt.hpc_version = True
+elif user_name == 'snk':
+    opt.hpc_version = False
+
+# if opt.hpc_version:
+#     if opt.checkpoint_dir:
+#         opt.checkpoint_dir = opt.checkpoint_dir.replace('checkpoints', '/share/data/zwq/GFRNet_pytorch_new/checkpoints')
+#     if opt.load_checkpoint:
+#         opt.load_checkpoint = opt.load_checkpoint.replace('checkpoints', '/share/data/zwq/GFRNet_pytorch_new/checkpoints')
+#     if opt.load_warpnet:
+#         opt.load_warpnet = opt.load_warpnet.replace('checkpoints', '/share/data/zwq/GFRNet_pytorch_new/checkpoints')
 
 
 def make_dir(dir_path):
