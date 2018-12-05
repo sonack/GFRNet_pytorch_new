@@ -415,12 +415,16 @@ class Runner(object):
         self.perp_crit.to(self.device)
 
 
-        self.GD_crit = nn.BCELoss()
-        self.LD_crit = nn.BCELoss()
+        D_crit = nn.BCELoss
+        if opt.use_LSGAN:
+            D_crit = nn.MSELoss
+        
+        self.GD_crit = D_crit()
+        self.LD_crit = D_crit()
 
         self.PD_crit = []
         for p in range(4):
-            self.PD_crit.append(nn.BCELoss())
+            self.PD_crit.append(D_crit())
 
         
     def load_checkpoint(self):
@@ -430,15 +434,16 @@ class Runner(object):
             ckpt = torch.load(opt.load_checkpoint)
             self.G.load_state_dict(ckpt['model'])
             if 'model_GD' in ckpt:
-                self.GD.load_state_dict(ckpt['model_GD'])
-                # pass
+                # self.GD.load_state_dict(ckpt['model_GD'])
+                pass
             if 'model_LD' in ckpt:
                 # print ('model_LD!!')
-                self.LD.load_state_dict(ckpt['model_LD'])
+                # self.LD.load_state_dict(ckpt['model_LD'])
+                pass
             if 'model_PD_L' in ckpt:
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
-                    self.PD[i].load_state_dict(ckpt['model_PD_%c' % p])
-                    # pass
+                    # self.PD[i].load_state_dict(ckpt['model_PD_%c' % p])
+                    pass
             
             # self.optim.load_state_dict(ckpt['optim'])
             if 'optim_GD' in ckpt:
