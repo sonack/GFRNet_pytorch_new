@@ -78,6 +78,12 @@ parser.add_argument('--kind', type=str, default="original", help='the degradatio
 
 parser.add_argument('--use_LSGAN', action='store_true', help='whether to use lsgan, remove sigmoid and replace bceloss with mseloss')
 
+# cond GD
+parser.add_argument('--GD_cond', type=int, default=3, help='3: uncond, 6: [w_gd, gt/res], 9: [w_gd, gd, gt/res]')
+# cond PD
+parser.add_argument('--PD_cond', type=int, default=3, help='3: uncond, 6: [w_gd, gt/res]')
+
+
 
 opt = parser.parse_args()
 
