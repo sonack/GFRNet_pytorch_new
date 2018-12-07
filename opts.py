@@ -64,6 +64,8 @@ parser.add_argument('--pd_R_l_w', type=float, default=1, help='the part right ey
 parser.add_argument('--pd_N_l_w', type=float, default=1, help='the part nose discriminator for G loss weight')
 parser.add_argument('--pd_M_l_w', type=float, default=1, help='the part mouth discriminator for G loss weight')
 
+parser.add_argument('--lr_l_w', type=float, default=10, help='the LR discriminator for G loss weight')
+parser.add_argument('--parts_expand', type=float, default=0.8, help='the parts expand multiplier')
 
 # save imgs
 # save blurred test images dir

@@ -176,7 +176,10 @@ class FaceDataset(Dataset):
         face_region_y2 = clamp_to_0_255(round(bottom_y))
 
         part_pos = []
-        part_expand_mult = [1.2, 1.2, 1.2, 1.2]
+        # part_expand_mult = [1.2, 1.2, 1.2, 1.2]
+        # part_expand_mult = [0.8, 0.8, 0.8, 0.8]
+        part_expand_mult = [opt.parts_expand] * 4
+
         for p in range(4):
             part_pos.append(
                 (
@@ -321,7 +324,7 @@ def test():
     
     print ('Dataset size:', len(face_dataset))
 
-    idx = 1224
+    idx = 2963
 
     sample = face_dataset[idx]
     face_region = sample['face_region_calc']
@@ -375,5 +378,5 @@ def test_load_dataset():
     plt.savefig('load_result')
 
 if __name__ == '__main__':
-    # test()
-    test_load_dataset()
+    test()
+    # test_load_dataset()
