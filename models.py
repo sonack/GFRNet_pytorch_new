@@ -133,10 +133,11 @@ class GFRNet_recNet(nn.Module):
         # e0 nn.ZeroGrad() ?
         self.encoder = nn.ModuleList()
         enc_ch_multipliers = [1, 2, 4, 8, 8, 8, 8, 8]
+        ch_mult = opt.ch_mult
         # e1 ~ e8
-        self.encoder.append(nn.Conv2d(6, opt.ngf, kernel_size=4, stride=2, padding=1))
+        self.encoder.append(nn.Conv2d(3 if opt.minus_WG else 6, opt.ngf * ch_mult, kernel_size=4, stride=2, padding=1))
         for idx in range(2, 9):
-            self.encoder.append(recNet_encoder_part(opt.ngf * enc_ch_multipliers[idx-2], opt.ngf * enc_ch_multipliers[idx-1], w_bn = (idx != 8)))
+            self.encoder.append(recNet_encoder_part(opt.ngf * enc_ch_multipliers[idx-2] * ch_mult, opt.ngf * enc_ch_multipliers[idx-1] * ch_mult, w_bn = (idx != 8)))
         
         # make decoder
         self.decoder = nn.ModuleList()
@@ -145,16 +146,19 @@ class GFRNet_recNet(nn.Module):
         # d1 ~ d8
         for idx in range(1, 8):
             w_dp = (idx < 4)
-            self.decoder.append(recNet_decoder_part(opt.ngf * dec_ch_in_multipliers[idx-1], opt.ngf * dec_ch_out_multipliers[idx-1], w_bn=True, w_dp=w_dp))
+            self.decoder.append(recNet_decoder_part(opt.ngf * dec_ch_in_multipliers[idx-1] * ch_mult, opt.ngf * dec_ch_out_multipliers[idx-1] * ch_mult, w_bn=True, w_dp=w_dp))
         self.decoder.append(nn.Sequential(
             nn.LeakyReLU(0.2),
-            nn.ConvTranspose2d(opt.ngf * 2, opt.output_nc_img, kernel_size=4, stride=2, padding=1)
+            nn.ConvTranspose2d(opt.ngf * 2 * ch_mult, opt.output_nc_img, kernel_size=4, stride=2, padding=1)
         ))
 
         self.out_act = nn.Sigmoid()
     
-    def forward(self, blur, warp_guide):
-        pair = torch.cat([blur, warp_guide], 1)
+    def forward(self, blur, warp_guide = None):
+        if opt.minus_WG:
+            pair = blur
+        else:
+            pair = torch.cat([blur, warp_guide], 1)
         # ZeroGrad() or end2end?
         self.encoder_outputs = list(range(8))
         self.encoder_outputs[0] = self.encoder[0](pair)
@@ -175,13 +179,21 @@ class GFRNet_recNet(nn.Module):
 class GFRNet_generator(nn.Module):
     def __init__(self):
         super(GFRNet_generator, self).__init__()
-        self.warpNet = GFRNet_warpnet()
+        if not (opt.minus_W or opt.minus_WG):
+            self.warpNet = GFRNet_warpnet()
         self.recNet = GFRNet_recNet()
     
     def forward(self, blur, guide):
-        warp_guide, grid = self.warpNet(blur, guide)
-        restored_img = self.recNet(blur, warp_guide.detach())
-        return warp_guide, grid, restored_img
+        if not (opt.minus_W or opt.minus_WG):
+            warp_guide, grid = self.warpNet(blur, guide)
+            restored_img = self.recNet(blur, warp_guide.detach())
+            return warp_guide, grid, restored_img
+        else:
+            if opt.minus_W: # -W
+                restored_img = self.recNet(blur, guide)
+            else: # -WG
+                restored_img = self.recNet(blur)
+            return restored_img
 
 
 # GAN Global D

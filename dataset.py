@@ -1,21 +1,24 @@
-from __future__ import print_function, division
+from __future__ import division, print_function
+
 import os
-from os import path
-import torch
-import cv2
-import numpy as np
-from custom_utils import file_suffix, clamp_to_0_255
-from collections import namedtuple
-from torch.utils.data import Dataset, DataLoader
-import random
-from math import floor, ceil
 import pdb
+import random
+from collections import namedtuple
+from math import ceil, floor
+from os import path
 
-
+import matplotlib.patches as patches
 # import matplotlib
 # matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
+import numpy as np
+
+import cv2
+import torch
+from custom_utils import clamp_to_0_255, file_suffix
+from opts import opt
+from torch.utils.data import DataLoader, Dataset
+
 
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
@@ -25,12 +28,11 @@ class dotdict(dict):
 
 
 
-opt = {
-    'img_size': 256
-}
+# opt = {
+#     'img_size': 256
+# }
 
-
-opt = dotdict(opt)
+# opt = dotdict(opt)
 
 img_suffixes = ['.png']
 POS_INF = 1e9

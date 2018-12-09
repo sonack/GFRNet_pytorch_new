@@ -67,6 +67,16 @@ parser.add_argument('--pd_M_l_w', type=float, default=1, help='the part mouth di
 parser.add_argument('--lr_l_w', type=float, default=10, help='the LR discriminator for G loss weight')
 parser.add_argument('--parts_expand', type=float, default=0.8, help='the parts expand multiplier')
 
+
+
+# ablation studies
+parser.add_argument('--ch_mult', type=int, default=1, help='the multiplier to recNet inner channels')
+parser.add_argument('--minus_W', action='store_true', help='-W, remove warpNet, recNet takes both I_d and I_g as input')
+parser.add_argument('--minus_WG', action='store_true', help='-WG, remove warpNet and guide, recNet takes only I_d as input')
+parser.add_argument('--minus_W2', action='store_true', help='-W2')
+parser.add_argument('--minus_WG2', action='store_true', help='-WG2')
+
+
 # save imgs
 # save blurred test images dir
 parser.add_argument('--sbt_dir', type=str, default="sbt", help='the base dir to save blurred test images')
@@ -91,6 +101,19 @@ parser.add_argument('--hpc_version', action='store_true', help='use on HPC serve
 
 
 opt = parser.parse_args()
+
+if opt.minus_W2:
+    opt.minus_W = True
+    opt.ch_mult = 2
+
+if opt.minus_WG2:
+    opt.minus_WG = True
+    opt.ch_mult = 2
+
+if opt.minus_W or opt.minus_WG:
+    opt.GD_cond = 3
+    opt.PD_cond = 3
+
 
 
 user_name = getpass.getuser()

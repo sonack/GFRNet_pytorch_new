@@ -55,6 +55,55 @@ class SymLoss(nn.Module):
         sym_loss = torch.pow(delta_grid_x * sym_y + delta_grid_y * sym_x, 2).sum()
         return sym_loss / ((h - self.C) * w * batch_size)
 
+class FullSymLoss(nn.Module):
+    def __init__(self, C):
+        super(FullSymLoss, self).__init__()
+        self.C = C
+    
+    def forward(self, grid, gt_sym_axis, gd_sym_axis):
+        # grid (N,2,H,W)
+        batch_size = grid.size()[0]
+        h = grid.size()[2]
+        w = grid.size()[3]
+
+        gt_sym_x = gt_sym_axis[:,0].view(batch_size)
+        gt_sym_y = gt_sym_axis[:,1].view(batch_size)
+        gd_sym_x = gd_sym_axis[:,0].view(batch_size)
+        gd_sym_y = gd_sym_axis[:,1].view(batch_size)
+
+        dxs = (-self.C * gt_sym_x).round().int()
+        dys = (self.C * gt_sym_y).round().int()
+        # pdb.set_trace()
+        sym_loss = 0
+        for b_i, (dx, dy, sym_x, sym_y) in enumerate(zip(dxs, dys, gd_sym_x, gd_sym_y)):
+            # dx > 0
+            # pdb.set_trace()
+            if dx > 0:
+                # print ('dx > 0')
+                # print (dx, dy)
+                # print (h, w)
+                # print (grid[b_i,0,:h-dy,:w-dx].shape)
+                # print (grid[b_i,0,dy:,dx:].shape)
+                delta_grid_x = grid[b_i,0,:h-dy,:w-dx] - grid[b_i,0,dy:,dx:]
+                delta_grid_y = grid[b_i,1,:h-dy,:w-dx] - grid[b_i,1,dy:,dx:]
+            else: # dx < 0
+                # print ('dx < 0')
+                # print (grid[b_i,0,dy:,:w+dx].shape)
+                # print (grid[b_i,1,:h-dy,-dx:].shape)
+                delta_grid_x = grid[b_i,0,dy:,:w+dx] - grid[b_i,0,:h-dy,-dx:]
+                delta_grid_y = grid[b_i,1,dy:,:w+dx] - grid[b_i,1,:h-dy,-dx:]
+            # print ('over', b_i)
+            # print (delta_grid_x.shape)
+            # print (delta_grid_y.shape)
+            # pdb.set_trace()
+            sym_loss += torch.pow(delta_grid_x * sym_y + delta_grid_y * sym_x, 2).mean()
+
+        # delta_grid_x = grid[:,0,:h-self.C,:] - grid[:,0,self.C:,:]
+        # delta_grid_y = grid[:,1,:h-self.C,:] - grid[:,1,self.C:,:]
+
+        # sym_loss = torch.pow(delta_grid_x * gd_sym_y + delta_grid_y * gd_sym_x, 2).sum()
+        # pdb.set_trace()
+        return sym_loss / batch_size
 
 
 class VggFaceLoss(nn.Module):
