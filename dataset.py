@@ -7,17 +7,17 @@ from collections import namedtuple
 from math import ceil, floor
 from os import path
 
-import numpy as np
-import torch
-from torch.utils.data import DataLoader, Dataset
-
-import cv2
 import matplotlib.patches as patches
 # import matplotlib
 # matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import numpy as np
+
+import cv2
+import torch
 from custom_utils import clamp_to_0_255, file_suffix
 from opts import opt
+from torch.utils.data import DataLoader, Dataset
 
 
 class dotdict(dict):
@@ -31,7 +31,6 @@ class dotdict(dict):
 # opt = {
 #     'img_size': 256
 # }
-
 
 # opt = dotdict(opt)
 
