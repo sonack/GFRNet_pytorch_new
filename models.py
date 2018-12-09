@@ -183,7 +183,7 @@ class GFRNet_generator(nn.Module):
             self.warpNet = GFRNet_warpnet()
         self.recNet = GFRNet_recNet()
     
-    def forward(self, blur, guide):
+    def forward(self, blur, guide = None):
         if not (opt.minus_W or opt.minus_WG):
             warp_guide, grid = self.warpNet(blur, guide)
             restored_img = self.recNet(blur, warp_guide.detach())
