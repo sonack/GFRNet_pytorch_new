@@ -90,6 +90,11 @@ parser.add_argument('--kind', type=str, default="original", help='the degradatio
 
 parser.add_argument('--use_LSGAN', action='store_true', help='whether to use lsgan, remove sigmoid and replace bceloss with mseloss')
 
+
+parser.add_argument('--load_checkpoint_B', type=str, default=None, help='the dir to another to load warpnet model checkpoint')
+parser.add_argument('--load_checkpoint_C', type=str, default=None, help='the dir to another another to load warpnet model checkpoint')
+
+
 # cond GD
 parser.add_argument('--GD_cond', type=int, default=3, help='3: uncond, 6: [w_gd, gt/res], 9: [w_gd, gd, gt/res]')
 # cond PD
@@ -98,6 +103,7 @@ parser.add_argument('--PD_cond', type=int, default=3, help='3: uncond, 6: [w_gd,
 
 
 parser.add_argument('--hpc_version', action='store_true', help='use on HPC servers')
+parser.add_argument('--use_resize_conv', action='store_true', help='use resize conv in Generator recNet')
 
 
 opt = parser.parse_args()

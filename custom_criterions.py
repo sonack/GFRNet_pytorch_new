@@ -105,6 +105,101 @@ class FullSymLoss(nn.Module):
         # pdb.set_trace()
         return sym_loss / batch_size
 
+class BilinearFullSymLoss(nn.Module):
+    def __init__(self, C):
+        super(BilinearFullSymLoss, self).__init__()
+        self.C = C
+    
+    def forward(self, grid, gt_sym_axis, gd_sym_axis):
+        # grid (N,2,H,W)
+        batch_size = grid.size()[0]
+        h = grid.size()[2]
+        w = grid.size()[3]
+
+        gt_sym_x = gt_sym_axis[:,0].view(batch_size)
+        gt_sym_y = gt_sym_axis[:,1].view(batch_size)
+        gd_sym_x = gd_sym_axis[:,0].view(batch_size)
+        gd_sym_y = gd_sym_axis[:,1].view(batch_size)
+
+        dxs = (-self.C * gt_sym_x)
+        dys = (self.C * gt_sym_y)
+        # pdb.set_trace()
+        sym_loss = 0
+        for b_i, (dx, dy, sym_x, sym_y) in enumerate(zip(dxs, dys, gd_sym_x, gd_sym_y)):
+            # dx > 0
+
+            dy1_f = dy.floor()
+            dy2_f = dy1_f + 1
+            dy1 = dy.floor().int()
+            dy2 = dy1 + 1
+
+            dx1_f = dx.floor()
+            dx2_f = dx1_f + 1
+            dx1 = dx.floor().int()
+            dx2 = dx1 + 1
+
+            if dx > 0:      
+                # print ('dx > 0')
+                # print (dx, dy)
+                # print (h, w)
+                # print (grid[b_i,0,:h-dy,:w-dx].shape)
+                # print (grid[b_i,0,dy:,dx:].shape)
+                # x2,y1 21
+                # x1 or y1, 会导致多一列/行 (最后一列/行)
+                delta_grid_x_11 = grid[b_i,0,:h-dy1-1,:w-dx1-1] - grid[b_i,0,dy1:-1,dx1:-1]
+                delta_grid_y_11 = grid[b_i,1,:h-dy1-1,:w-dx1-1] - grid[b_i,1,dy1:-1,dx1:-1]
+                delta_grid_x_21 = grid[b_i,0,:h-dy1-1,:w-dx2] - grid[b_i,0,dy1:-1,dx2:]
+                delta_grid_y_21 = grid[b_i,1,:h-dy1-1,:w-dx2] - grid[b_i,1,dy1:-1,dx2:]
+                delta_grid_x_12 = grid[b_i,0,:h-dy2,:w-dx1-1] - grid[b_i,0,dy2:,dx1:-1]
+                delta_grid_y_12 = grid[b_i,1,:h-dy2,:w-dx1-1] - grid[b_i,1,dy2:,dx1:-1]
+                delta_grid_x_22 = grid[b_i,0,:h-dy2,:w-dx2] - grid[b_i,0,dy2:,dx2:]
+                delta_grid_y_22 = grid[b_i,1,:h-dy2,:w-dx2] - grid[b_i,1,dy2:,dx2:]
+                
+                # pdb.set_trace()
+
+                # delta_grid_x = (dx - dx1_f) * (dy - dy1_f) * delta_grid_x_22 + (dx - dx1_f) * (dy2_f - dy) * delta_grid_x_21 + (dx2_f - dx) * (dy - dy1_f) * delta_grid_x_12 + (dx2_f - dx) * (dy2_f - dy) * delta_grid_x_11
+                # delta_grid_y = (dx - dx1_f) * (dy - dy1_f) * delta_grid_y_22 + (dx - dx1_f) * (dy2_f - dy) * delta_grid_y_21 + (dx2_f - dx) * (dy - dy1_f) * delta_grid_y_12 + (dx2_f - dx) * (dy2_f - dy) * delta_grid_y_11
+
+            else: # dx <= 0
+                # print ('dx < 0')
+                # print (grid[b_i,0,dy:,:w+dx].shape)
+                # print (grid[b_i,1,:h-dy,-dx:].shape)
+                # x2 的第一列不能要
+                # y1 的第一行不能要
+                delta_grid_x_11 = grid[b_i,0,dy1+1:,:w+dx1] - grid[b_i,0,1:h-dy1,-dx1:]
+                delta_grid_y_11 = grid[b_i,1,dy1+1:,:w+dx1] - grid[b_i,1,1:h-dy1,-dx1:]
+                delta_grid_x_21 = grid[b_i,0,dy1+1:,1:w+dx2] - grid[b_i,0,1:h-dy1,-dx2+1:]
+                delta_grid_y_21 = grid[b_i,1,dy1+1:,1:w+dx2] - grid[b_i,1,1:h-dy1,-dx2+1:]
+                delta_grid_x_12 = grid[b_i,0,dy2:,:w+dx1] - grid[b_i,0,:h-dy2,-dx1:]
+                delta_grid_y_12 = grid[b_i,1,dy2:,:w+dx1] - grid[b_i,1,:h-dy2,-dx1:]
+                delta_grid_x_22 = grid[b_i,0,dy2:,1:w+dx2] - grid[b_i,0,:h-dy2,-dx2+1:]
+                delta_grid_y_22 = grid[b_i,1,dy2:,1:w+dx2] - grid[b_i,1,:h-dy2,-dx2+1:]
+
+                
+
+            # pdb.set_trace()
+
+            # 大小和对称轴的歪转程度有关系
+            # dx <= 0 : torch.Size([246, 255])
+            # dx > 0 : torch.Size([246, 255])
+
+            # dx > 0: torch.Size([246, 254]) seed 5222
+            # dx < 0: torch.Size([247, 251]) seed 5221
+
+            delta_grid_x = (dx - dx1_f) * (dy - dy1_f) * delta_grid_x_22 + (dx - dx1_f) * (dy2_f - dy) * delta_grid_x_21 + (dx2_f - dx) * (dy - dy1_f) * delta_grid_x_12 + (dx2_f - dx) * (dy2_f - dy) * delta_grid_x_11
+            delta_grid_y = (dx - dx1_f) * (dy - dy1_f) * delta_grid_y_22 + (dx - dx1_f) * (dy2_f - dy) * delta_grid_y_21 + (dx2_f - dx) * (dy - dy1_f) * delta_grid_y_12 + (dx2_f - dx) * (dy2_f - dy) * delta_grid_y_11
+            # print ('over', b_i)
+            # print (delta_grid_x.shape)
+            # print (delta_grid_y.shape)
+            # pdb.set_trace()
+            sym_loss += torch.pow(delta_grid_x * sym_y + delta_grid_y * sym_x, 2).mean()
+
+        # delta_grid_x = grid[:,0,:h-self.C,:] - grid[:,0,self.C:,:]
+        # delta_grid_y = grid[:,1,:h-self.C,:] - grid[:,1,self.C:,:]
+
+        # sym_loss = torch.pow(delta_grid_x * gd_sym_y + delta_grid_y * gd_sym_x, 2).sum()
+        # pdb.set_trace()
+        return sym_loss / batch_size
 
 class VggFaceLoss(nn.Module):
     def __init__(self, ver = 3):

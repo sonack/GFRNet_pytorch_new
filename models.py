@@ -109,13 +109,20 @@ class recNet_encoder_part(nn.Module):
     def forward(self, x):
         return self.part(x)
 
+
 class recNet_decoder_part(nn.Module):
     def __init__(self, ch_in, ch_out, w_bn = True, w_dp = True):
         super(recNet_decoder_part, self).__init__()
         modules = [
             nn.LeakyReLU(0.2),
-            nn.ConvTranspose2d(ch_in, ch_out, 4, 2, 1),
         ]
+
+        if opt.use_resize_conv:
+            modules.append(nn.Upsample(scale_factor = 2, mode='bilinear'))
+            modules.append(nn.ReflectionPad2d(1))
+            modules.append(nn.Conv2d(ch_in, ch_out, kernel_size=3, stride=1, padding=0))
+        else:
+            modules.append(nn.ConvTranspose2d(ch_in, ch_out, 4, 2, 1))
         if w_bn:
             modules.append(nn.BatchNorm2d(ch_out))
         if w_dp:
@@ -147,10 +154,18 @@ class GFRNet_recNet(nn.Module):
         for idx in range(1, 8):
             w_dp = (idx < 4)
             self.decoder.append(recNet_decoder_part(opt.ngf * dec_ch_in_multipliers[idx-1] * ch_mult, opt.ngf * dec_ch_out_multipliers[idx-1] * ch_mult, w_bn=True, w_dp=w_dp))
-        self.decoder.append(nn.Sequential(
-            nn.LeakyReLU(0.2),
-            nn.ConvTranspose2d(opt.ngf * 2 * ch_mult, opt.output_nc_img, kernel_size=4, stride=2, padding=1)
-        ))
+        if opt.use_resize_conv:
+            self.decoder.append(nn.Sequential(
+                nn.LeakyReLU(0.2),
+                nn.Upsample(scale_factor = 2, mode='bilinear'),
+                nn.ReflectionPad2d(1),
+                nn.Conv2d(opt.ngf * 2 * ch_mult, opt.output_nc_img, kernel_size=3, stride=1, padding=0)
+            ))
+        else:
+            self.decoder.append(nn.Sequential(
+                nn.LeakyReLU(0.2),
+                nn.ConvTranspose2d(opt.ngf * 2 * ch_mult, opt.output_nc_img, kernel_size=4, stride=2, padding=1)
+            ))
 
         self.out_act = nn.Sigmoid()
     
