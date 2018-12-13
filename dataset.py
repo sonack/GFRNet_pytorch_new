@@ -72,7 +72,7 @@ class LoadFaceDataset(Dataset):
         return sample
 
 class FaceDataset(Dataset):
-    def __init__(self, img_dir = None, landmark_dir = None, sym_dir = None, flip_prob = 0.5, transform = None, test_mode = False):
+    def __init__(self, img_dir = None, landmark_dir = None, sym_dir = None, mask_dir = None, face_masks_dir = None, flip_prob = 0.5, transform = None, test_mode = False):
         assert not (img_dir is None), "img_dir is None!"
         if not test_mode:
             assert not (landmark_dir is None), "train landmark_dir is None!"
@@ -81,6 +81,8 @@ class FaceDataset(Dataset):
         self.img_dir = img_dir
         self.landmark_dir = landmark_dir
         self.sym_dir = sym_dir
+        self.mask_dir = mask_dir
+        self.face_masks_dir = face_masks_dir
 
         if self.mode == "test":
             flip_prob = -1
@@ -263,6 +265,9 @@ class FaceDataset(Dataset):
         left = image[:,:wd,:]
         right = image[:,wd:,:]
 
+        
+
+
         # .copy() see [https://discuss.pytorch.org/t/torch-from-numpy-not-support-negative-strides/3663]
         if self.flip_flag:
             left = np.fliplr(left).copy()
@@ -271,8 +276,34 @@ class FaceDataset(Dataset):
 
         file_id_name, face_region = self.parse_filename(self._img_list[idx])
 
-       
-    
+
+        if self.mask_dir:
+            mask_file = path.join(self.mask_dir, path.splitext(file_id_name)[0])
+            # print (mask_file)
+            # astype np.bool is to set 255 to 1
+            mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE).astype(np.bool).astype(np.float32)
+            # print (self.mask_dir)
+            # print (mask.shape)
+
+            if self.flip_flag:
+                mask = np.fliplr(mask).copy()
+            # pdb.set_trace()
+        
+
+        if self.face_masks_dir:
+            face_masks_file = path.join(self.face_masks_dir, path.splitext(file_id_name)[0])
+            face_masks = cv2.imread(face_masks_file, cv2.IMREAD_GRAYSCALE).astype(np.bool).astype(np.float32)
+            wd = int(face_masks.shape[1] // 2)
+            # (H, W)
+            # pdb.set_trace()
+            l_fm = face_masks[:,:wd]
+            r_fm = face_masks[:,wd:]
+            if self.flip_flag:
+                l_fm = np.fliplr(l_fm).copy()
+                r_fm = np.fliplr(r_fm).copy()
+        
+        # pdb.set_trace()
+
         # if self.sym_dir is None, then do not use sym info
         if self.landmark_dir:
             lm_file = path.join(self.landmark_dir, file_id_name)
@@ -310,6 +341,13 @@ class FaceDataset(Dataset):
             sample['sym_l'] = sym_l
             sample['sym_r'] = sym_r
         
+        if self.mask_dir:
+            sample['mask'] = mask
+        
+        if self.face_masks_dir:
+            sample['l_fm'] = l_fm
+            sample['r_fm'] = r_fm
+        
         if self.transform:
             sample = self.transform(sample)
         
@@ -319,8 +357,10 @@ def test():
     img_dir = './DataSets/Original/Train'
     landmark_dir = 'DataSets/Original/Landmark'
     sym_dir = None
+    mask_dir = './DataSets/Original/Masks/Intersect'
+    face_masks_dir = "./DataSets/Original/Masks/Basic"
     # sym_dir = 'DataSets/Original/Sym_bz'
-    face_dataset = FaceDataset(img_dir, landmark_dir, sym_dir, -1, None, False)
+    face_dataset = FaceDataset(img_dir, landmark_dir, sym_dir, mask_dir, face_masks_dir, -1, None, False)
 
     # face_dataset = FaceDataset(img_dir, test_mode=True)
     
@@ -344,8 +384,9 @@ def test():
     h = p2.y - p1.y
 
 
+    
 
-    fig, ax = plt.subplots(1,1)
+    fig, [ax, ax2, ax3, ax4] = plt.subplots(1,4)
     # 左上角坐标 (宽,高)
     # 坐标原点 左上角
     rect = patches.Rectangle((p1.x,p1.y),w,h,linewidth=1,edgecolor='green',facecolor='none')
@@ -361,12 +402,22 @@ def test():
     # ax.scatter([50,30],[50,200], s=20, c='blue', marker='o')
     # ax.scatter(lm_l[ : , 0 ], lm_l[ : , 1 ], s=10, c='r', marker='x')
     
+    ax.axis('off')
     ax.imshow(sample['gt'])
+
+    ax2.axis('off')
+    ax2.imshow(sample['mask'], cmap='gray')
+
+    ax3.axis('off')
+    ax3.imshow(sample['l_fm'], cmap='gray')
+
+    ax4.axis('off')
+    ax4.imshow(sample['r_fm'], cmap='gray')
 
     print (sample['img_path'])
     # print (sample['sym_l'])
     # print (sample['sym_r'])
-
+    
     plt.savefig('result')
 
 def test_load_dataset():

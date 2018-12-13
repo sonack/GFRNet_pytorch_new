@@ -58,6 +58,7 @@ parser.add_argument('--mse_l_w', type=float, default=0.1, help='the rec mse loss
 parser.add_argument('--perp_l_w', type=float, default=0.001, help='the rec perp vgg face loss weight')
 parser.add_argument('--gd_l_w', type=float, default=1, help='the global discriminator for G loss weight')
 parser.add_argument('--ld_l_w', type=float, default=0.5, help='the local discriminator for G loss weight')
+parser.add_argument('--f2f_l_w', type=float, default=1, help='the face2face loss weight')
 
 parser.add_argument('--pd_L_l_w', type=float, default=1, help='the part left eye discriminator for G loss weight')
 parser.add_argument('--pd_R_l_w', type=float, default=1, help='the part right eye discriminator for G loss weight')
@@ -104,6 +105,12 @@ parser.add_argument('--PD_cond', type=int, default=3, help='3: uncond, 6: [w_gd,
 
 parser.add_argument('--hpc_version', action='store_true', help='use on HPC servers')
 parser.add_argument('--use_resize_conv', action='store_true', help='use resize conv in Generator recNet')
+parser.add_argument('--train_mask_dir', type=str, default=None)
+parser.add_argument('--test_mask_dir', type=str, default=None)
+
+# train/test face_masks_dir
+parser.add_argument('--face_masks_dir', type=str, default=None)
+
 
 
 opt = parser.parse_args()
