@@ -16,6 +16,8 @@ class ToTensor(object):
             sample['blur'] = self.to_tensor(sample['blur'])
         if 'guide' in sample:
             sample['guide'] = self.to_tensor(sample['guide'])
+        # if 'mask' in sample:
+        #     sample['mask'] = self.to_tensor(sample['mask'])
         return sample
 
 
