@@ -5,6 +5,8 @@ from netVggs.netVgg_conv4 import netVgg_conv4
 import pdb
 from stn_module import STN
 
+from opts import opt
+
 
 class MaskedMSELoss(nn.Module):
     def __init__(self, reduction=None):
@@ -312,14 +314,20 @@ class Face2FaceLoss(nn.Module):
     def __init__(self):
         super(Face2FaceLoss, self).__init__()
         self.stn = STN()
+        self.mse_loss = nn.MSELoss()
 
     def forward(self, grid, l_fm, r_fm):
         batch_size = grid.size(0)
         grid_NHWC = grid.permute(0,2,3,1)
-        gd_fm = r_fm.unsqueeze(1)
-        warp_fm = self.stn(gd_fm, grid_NHWC)
-        l1_loss = torch.abs(warp_fm - l_fm)
-        return warp_fm, l1_loss.mean()
+        warp_fm = self.stn(r_fm, grid_NHWC)
+        if opt.f2f_kind == "l1":
+            # pdb.set_trace()
+            l1_loss = torch.abs(warp_fm - l_fm)
+            final_loss = l1_loss.mean()
+        elif opt.f2f_kind == "l2":
+            l2_loss = self.mse_loss(warp_fm, l_fm)
+            final_loss = l2_loss
+        return warp_fm, final_loss
 
 
 class VggFaceLoss(nn.Module):

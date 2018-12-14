@@ -108,8 +108,12 @@ parser.add_argument('--use_resize_conv', action='store_true', help='use resize c
 parser.add_argument('--train_mask_dir', type=str, default=None)
 parser.add_argument('--test_mask_dir', type=str, default=None)
 
+
+
 # train/test face_masks_dir
 parser.add_argument('--face_masks_dir', type=str, default=None)
+parser.add_argument('--f2f_kind', type=str, default="l2")
+
 
 
 
