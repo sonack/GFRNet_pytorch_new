@@ -79,12 +79,14 @@ class Runner(object):
                 sym_gd = sb['sym_r'].to(device)
                 # sym_l = opt.sym_l_w * self.sym_crit(grid, sym_gd)
                 mask = sb['mask'].to(device)
+                # pdb.set_trace()
                 sym_l = opt.sym_l_w * self.sym_crit(grid, sym_gt, sym_gd, mask)
 
             f2f_l = torch.Tensor([0]).to(device)
             if opt.face_masks_dir:
                 l_fm = sb['l_fm'].to(device)
                 r_fm = sb['r_fm'].to(device)
+                # pdb.set_trace()
                 warp_fm, f2f_err = self.f2f_crit(grid, l_fm, r_fm)
                 
                 f2f_l = opt.f2f_l_w * f2f_err
@@ -128,7 +130,7 @@ class Runner(object):
             if self.i_batch_tot % opt.disp_freq == 0:
                 self.writer.add_image('train/guide-gt-blur-warp', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt]], 2), self.i_batch_tot)
                 # pdb.set_trace()
-                self.writer.add_image('train/gdfm-warp_gdfm-gtfm', torch.cat([r_fm.unsqueeze(1)[:opt.disp_img_cnt], warp_fm[:opt.disp_img_cnt], l_fm.unsqueeze(1)[:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                self.writer.add_image('train/gdfm-warp_gdfm-gtfm', torch.cat([r_fm[:opt.disp_img_cnt], warp_fm[:opt.disp_img_cnt], l_fm[:opt.disp_img_cnt]], 2), self.i_batch_tot)
                 self.writer.add_scalar('train/pt_loss', self.ms['pt'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/tv_loss', self.ms['tv'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/sym_loss', self.ms['sym'].mean, self.i_batch_tot)

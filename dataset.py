@@ -293,11 +293,15 @@ class FaceDataset(Dataset):
         if self.face_masks_dir:
             face_masks_file = path.join(self.face_masks_dir, path.splitext(file_id_name)[0])
             face_masks = cv2.imread(face_masks_file, cv2.IMREAD_GRAYSCALE).astype(np.bool).astype(np.float32)
-            wd = int(face_masks.shape[1] // 2)
+            # face_masks = face_masks[..., np.newaxis]
+            # (C, H, W)
+            face_masks = face_masks[np.newaxis, ...]
+
+            wd = int(face_masks.shape[2] // 2)
             # (H, W)
             # pdb.set_trace()
-            l_fm = face_masks[:,:wd]
-            r_fm = face_masks[:,wd:]
+            l_fm = face_masks[:,:,:wd]
+            r_fm = face_masks[:,:,wd:]
             if self.flip_flag:
                 l_fm = np.fliplr(l_fm).copy()
                 r_fm = np.fliplr(r_fm).copy()
