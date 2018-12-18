@@ -12,7 +12,7 @@ import custom_transforms
 import dataset
 from torch.utils.data import Dataset, DataLoader
 import models
-from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch
+from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch, print_inter_grad
 
 from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
@@ -111,6 +111,12 @@ class Runner(object):
     # one epoch train
     def train_one_epoch(self, cur_e = 0):
         device = self.device
+        # grid_grad_meter = Meter()
+        # grid_grad_func = print_inter_grad("grid grad", grid_grad_meter)
+
+        # inter_grad_meter = Meter()
+        # inter_grad_func = print_inter_grad("recNet encoder[0].weight grad", inter_grad_meter)
+
         for i_b, sb in enumerate(self.train_dl):
             # if i_b > 100:
             #     break
@@ -139,6 +145,12 @@ class Runner(object):
             perp_l = opt.perp_l_w * self.perp_crit(res, gt)
 
             rec_l = perp_l + mse_l
+
+ 
+            # grid.register_hook(grid_grad_func)
+            # self.G.recNet.encoder[0].weight.register_hook(inter_grad_func)
+            # res.register_hook(print_inter_grad("rec tensor grad"))
+
 
             # gan loss
             ## Global GAN
@@ -193,6 +205,8 @@ class Runner(object):
             # adv_l = GD_G_l + LD_G_l
 
             tot_l = flow_l + rec_l + adv_l
+            # tot_l = rec_l + adv_l
+            # tot_l = rec_l
             # tot_l = adv_l
 
             self.G.zero_grad()
@@ -298,6 +312,7 @@ class Runner(object):
             self.i_batch_tot += 1
 
             if i_b % opt.print_freq == 0:
+                # print ('[%d] inter grad tensor grad scale is' % i_b, inter_grad_meter.mean)
                 print ('[Train]: %s [%d/%d] (%d/%d)\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tGD Loss: [%.12f/%.12f]\tLD Loss: [%.12f/%.12f]\tPD Loss: [%.12f/%.12f]\tLR Loss: [%.12f/%.12f]\tTot Loss=%.12f' % (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
                     cur_e,
@@ -623,11 +638,11 @@ class Runner(object):
         train_tsfm_c = transforms.Compose(train_tsfms)
         test_tsfm_c = transforms.Compose(test_tsfms)
         
-        self.train_dataset = dataset.FaceDataset(opt.train_img_dir, opt.train_landmark_dir, opt.train_sym_dir, opt.flip_prob, train_tsfm_c, False)
+        self.train_dataset = dataset.FaceDataset(opt.train_img_dir, opt.train_landmark_dir, opt.train_sym_dir, opt.train_mask_dir, opt.face_masks_dir, opt.flip_prob, train_tsfm_c, False)
         self.train_dl = DataLoader(self.train_dataset, batch_size = opt.batch_size, shuffle = True, num_workers = opt.num_workers)
         self.train_BNPE = len(self.train_dl)
 
-        self.test_dataset = dataset.FaceDataset(opt.test_img_dir, opt.test_landmark_dir, opt.test_sym_dir, -1, test_tsfm_c, True)
+        self.test_dataset = dataset.FaceDataset(opt.test_img_dir, opt.test_landmark_dir, opt.test_sym_dir, opt.test_mask_dir, opt.face_masks_dir, -1, test_tsfm_c, True)
         self.test_dl = DataLoader(self.test_dataset, batch_size = opt.batch_size, shuffle = False, num_workers = opt.num_workers)
         self.test_BNPE = len(self.test_dl)
 

@@ -27,6 +27,12 @@
 # python train_full_part_local_GAN_cond_SP_LR.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_19" --print_freq 100 --disp_freq 100  --save_epoch_freq 5 --pd_L_l_w 1 --pd_R_l_w 1 --pd_N_l_w 1 --pd_M_l_w 1 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --load_checkpoint './checkpoints/exp_18/ckpt_310.pt' --parts_expand 1.2
 
 
-python train_full_part_local_GAN_cond_SP_LR.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_25" --print_freq 100 --disp_freq 100 --save_epoch_freq 20 --pd_L_l_w 2 --pd_R_l_w 2 --pd_N_l_w 2 --pd_M_l_w 2 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --perp_l_w 0 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --load_warpnet "./checkpoints/exp_1/ckpt_040.pt" --use_resize_conv
+# python train_full_part_local_GAN_cond_SP_LR.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_25_debug" --print_freq 10 --disp_freq 100 --save_epoch_freq 20 --pd_L_l_w 2 --pd_R_l_w 2 --pd_N_l_w 2 --pd_M_l_w 2 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --perp_l_w 0 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --load_warpnet "./checkpoints/exp_1/ckpt_040.pt"  --manual_seed 1996
+
+
+# python train_full_part_local_GAN_cond_SP_LR.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_25_debug" --print_freq 10 --disp_freq 100 --save_epoch_freq 20 --pd_L_l_w 4 --pd_R_l_w 4 --pd_N_l_w 4 --pd_M_l_w 4 --gd_l_w 2 --ld_l_w 1 --lr_l_w 2 --perp_l_w 0 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --load_warpnet "./checkpoints/exp_1/ckpt_040.pt" --lr 2e-5
+
+
 # --load_checkpoint './checkpoints/exp_19/ckpt_465.pt' 
+# --use_resize_conv
 

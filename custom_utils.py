@@ -51,10 +51,20 @@ def weight_init(m):
         m.bias.data.fill_(0)
 
 
-def print_inter_grad(msg):
+def print_inter_grad(msg, avg = None):
+    # cnt = 1
     def func(x):
-        print (msg)
-        print (x.norm().item())
+        # print ("x.size")
+        # (16, 2, 256, 256)
+        # print (x.size())
+        # nonlocal cnt
+        if avg:
+            avg.add(x.norm().item())
+        # print (msg)
+        # print (cnt)
+        # cnt += 1
+        # print ('avg =', avg.mean)
+        # print (x.norm().item())
     return func
 
 
