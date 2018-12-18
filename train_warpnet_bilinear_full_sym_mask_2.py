@@ -74,7 +74,7 @@ class Runner(object):
             pt_l = opt.pt_l_w * self.point_crit(grid, lm_gt, lm_mask)
             tv_l = opt.tv_l_w * self.tv_crit(grid - self.orig_xy_map)
             sym_l = torch.Tensor([0]).to(device)
-            if opt.train_sym_dir and opt.train_mask_dir and opt.face_masks_dir:
+            if opt.train_sym_dir and opt.train_mask_dir:
                 sym_gt = sb['sym_l'].to(device)
                 sym_gd = sb['sym_r'].to(device)
                 # sym_l = opt.sym_l_w * self.sym_crit(grid, sym_gd)
