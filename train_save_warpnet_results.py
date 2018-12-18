@@ -290,11 +290,11 @@ class Runner(object):
         train_tsfm_c = transforms.Compose(train_tsfms)
         test_tsfm_c = transforms.Compose(test_tsfms)
         
-        self.train_dataset = dataset.FaceDataset(opt.train_img_dir, opt.train_landmark_dir, opt.train_sym_dir, opt.flip_prob, train_tsfm_c, False)
+        self.train_dataset = dataset.FaceDataset(opt.train_img_dir, opt.train_landmark_dir, opt.train_sym_dir, None, None, opt.flip_prob, train_tsfm_c, False)
         self.train_dl = DataLoader(self.train_dataset, batch_size = opt.batch_size, shuffle = True, num_workers = opt.num_workers)
         self.train_BNPE = len(self.train_dl)
 
-        self.test_dataset = dataset.FaceDataset(opt.test_img_dir, opt.test_landmark_dir, opt.test_sym_dir, -1, test_tsfm_c, True)
+        self.test_dataset = dataset.FaceDataset(opt.test_img_dir, opt.test_landmark_dir, opt.test_sym_dir, None, None, -1, test_tsfm_c, True)
         self.test_dl = DataLoader(self.test_dataset, batch_size = opt.batch_size, shuffle = False, num_workers = opt.num_workers)
         self.test_BNPE = len(self.test_dl)
 

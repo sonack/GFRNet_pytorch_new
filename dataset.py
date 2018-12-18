@@ -278,6 +278,8 @@ class FaceDataset(Dataset):
 
 
         if self.mask_dir:
+            # print (self.mask_dir)
+            # pdb.set_trace()
             mask_file = path.join(self.mask_dir, path.splitext(file_id_name)[0])
             # print (mask_file)
             # astype np.bool is to set 255 to 1
