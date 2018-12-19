@@ -19,7 +19,6 @@ from custom_utils import clamp_to_0_255, file_suffix
 from opts import opt
 from torch.utils.data import DataLoader, Dataset
 
-
 class dotdict(dict):
     """dot.notation access to dictionary attributes"""
     __getattr__ = dict.get
@@ -265,11 +264,10 @@ class FaceDataset(Dataset):
         left = image[:,:wd,:]
         right = image[:,wd:,:]
 
-        
-
 
         # .copy() see [https://discuss.pytorch.org/t/torch-from-numpy-not-support-negative-strides/3663]
         if self.flip_flag:
+            # (256, 256, 3)
             left = np.fliplr(left).copy()
             right = np.fliplr(right).copy()
         
@@ -285,6 +283,7 @@ class FaceDataset(Dataset):
             # astype np.bool is to set 255 to 1
             mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE).astype(np.bool).astype(np.float32)
             # print (self.mask_dir)
+            # print ('mask.shape is')
             # print (mask.shape)
 
             if self.flip_flag:
@@ -297,16 +296,20 @@ class FaceDataset(Dataset):
             face_masks = cv2.imread(face_masks_file, cv2.IMREAD_GRAYSCALE).astype(np.bool).astype(np.float32)
             # face_masks = face_masks[..., np.newaxis]
             # (C, H, W)
-            face_masks = face_masks[np.newaxis, ...]
+            # face_masks = face_masks[np.newaxis, ...]
 
-            wd = int(face_masks.shape[2] // 2)
+            wd = int(face_masks.shape[1] // 2)
             # (H, W)
             # pdb.set_trace()
-            l_fm = face_masks[:,:,:wd]
-            r_fm = face_masks[:,:,wd:]
+            l_fm = face_masks[:,:wd]
+            r_fm = face_masks[:,wd:]
             if self.flip_flag:
+                # (256, 256)
                 l_fm = np.fliplr(l_fm).copy()
                 r_fm = np.fliplr(r_fm).copy()
+            # (C, H, W)            
+            l_fm = l_fm[np.newaxis, ...]
+            r_fm = r_fm[np.newaxis, ...]
         
         # pdb.set_trace()
 
@@ -366,7 +369,7 @@ def test():
     mask_dir = './DataSets/Original/Masks/Intersect'
     face_masks_dir = "./DataSets/Original/Masks/Basic"
     # sym_dir = 'DataSets/Original/Sym_bz'
-    face_dataset = FaceDataset(img_dir, landmark_dir, sym_dir, mask_dir, face_masks_dir, -1, None, False)
+    face_dataset = FaceDataset(img_dir, landmark_dir, sym_dir, mask_dir, face_masks_dir, 1, None, False)
 
     # face_dataset = FaceDataset(img_dir, test_mode=True)
     
@@ -415,16 +418,17 @@ def test():
     ax2.imshow(sample['mask'], cmap='gray')
 
     ax3.axis('off')
-    ax3.imshow(sample['l_fm'], cmap='gray')
+    # pdb.set_trace()
+    ax3.imshow(sample['l_fm'][0], cmap='gray')
 
     ax4.axis('off')
-    ax4.imshow(sample['r_fm'], cmap='gray')
+    ax4.imshow(sample['r_fm'][0], cmap='gray')
 
     print (sample['img_path'])
     # print (sample['sym_l'])
     # print (sample['sym_r'])
     
-    plt.savefig('result')
+    plt.savefig('result2')
 
 def test_load_dataset():
     load_dataset = LoadFaceDataset("./sbt/sb_7", None)
