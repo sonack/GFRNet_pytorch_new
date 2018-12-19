@@ -131,6 +131,7 @@ class Runner(object):
                 self.writer.add_image('train/guide-gt-blur-warp', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt]], 2), self.i_batch_tot)
                 # pdb.set_trace()
                 self.writer.add_image('train/gdfm-warp_gdfm-gtfm', torch.cat([r_fm[:opt.disp_img_cnt], warp_fm[:opt.disp_img_cnt], l_fm[:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                # self.writer.add_text('imgs names', "\n\n".join(sb['img_path'][:opt.disp_img_cnt]), self.i_batch_tot)
                 self.writer.add_scalar('train/pt_loss', self.ms['pt'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/tv_loss', self.ms['tv'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/sym_loss', self.ms['sym'].mean, self.i_batch_tot)
