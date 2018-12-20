@@ -94,9 +94,9 @@ class Runner(object):
 
             # grid.register_hook(print_inter_grad("grid tensor grad"))
 
-            # tot_l = pt_l + tv_l + sym_l + f2f_l
+            tot_l = pt_l + tv_l + sym_l + f2f_l
             # tot_l = pt_l
-            tot_l = f2f_l
+            # tot_l = f2f_l
 
             self.warpnet.zero_grad()
             tot_l.backward()
