@@ -163,11 +163,6 @@ class DegradationModel(object):
         self.upSampler = UpSampler(self.downSampler.scale)
         self.awgn = AWGN(random.choice(self.awgn_level_list))
         self.jpegCompressor = JPEGCompressor(random.choice(self.jpeg_quality_list))
-
-
-    
-    def change_mode(self, mode):
-        pass
             
 
     def random_params(self):
