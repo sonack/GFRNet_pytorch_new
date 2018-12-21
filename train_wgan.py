@@ -12,7 +12,7 @@ import custom_transforms
 import dataset
 from torch.utils.data import Dataset, DataLoader
 import models
-from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch, print_inter_grad, calc_gradient_penalty
+from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch, print_inter_grad, calc_gradient_penalty, debug_info
 
 from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
@@ -146,7 +146,9 @@ class Runner(object):
 
         # grid.register_hook(grid_grad_func)
         # self.G.recNet.encoder[0].weight.register_hook(inter_grad_func)
-        # res.register_hook(print_inter_grad("rec tensor grad"))
+
+        if opt.debug:
+            res.register_hook(print_inter_grad("rec tensor grad"))
 
 
         # gan loss
@@ -184,10 +186,12 @@ class Runner(object):
             errLR_G = self.LR_crit(output, label)
         LR_G_l = opt.lr_l_w * errLR_G
 
-        # adv_l = LD_G_l
         # adv_l = PD_G_l
-        adv_l = GD_G_l + PD_G_l + LD_G_l + LR_G_l
+        # adv_l = GD_G_l + PD_G_l + LD_G_l + LR_G_l
         # adv_l = GD_G_l + LD_G_l
+        adv_l = GD_G_l
+        # adv_l = LD_G_l
+
 
         # tot_l = flow_l + rec_l + adv_l
         # tot_l = rec_l + adv_l
@@ -366,7 +370,7 @@ class Runner(object):
 
 
         if opt.use_WGAN and not opt.use_WGAN_GP:
-            print ('Weight Clipping!')
+            debug_info ('Weight Clipping!')
             for netD in self.models[1:]:
                 for p in netD.parameters():
                     p.data.clamp_(opt.clamp_lower, opt.clamp_upper)
@@ -412,6 +416,8 @@ class Runner(object):
 
         # inter_grad_meter = Meter()
         # inter_grad_func = print_inter_grad("recNet encoder[0].weight grad", inter_grad_meter)
+        if opt.debug:
+            self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
         
         for i_b, sb in enumerate(self.train_dl):
             # if i_b > 100:
@@ -436,11 +442,16 @@ class Runner(object):
             #     'p_p': p_p
             # }
             if gen_iterations < 25 or gen_iterations % 500 == 0:
-                Diters = 10
+                Diters = 100
             else:
                 Diters = opt.Diters
 
-            for iter_of_d in tqdm(range(Diters)):
+            range_obj = range(Diters)
+            if not opt.hpc_version:
+                range_obj = tqdm(range_obj)
+                pass
+            for iter_of_d in range_obj:
+            # for iter_of_d in tqdm(range(Diters)):
             # for iter_of_d in range(Diters):
                 self.prepare_all_gans_data()
                 self.train_Ds(end_flag = (iter_of_d == Diters - 1))

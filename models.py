@@ -2,7 +2,7 @@ from stn_module import STN
 import torch.nn as nn
 from opts import opt
 import torch
-
+import pdb
 
 def warpNet_encoder():
     return  nn.Sequential(
@@ -243,7 +243,7 @@ class GFRNet_globalDiscriminator(nn.Module):
         # modules.append(nn.Conv2d(ndf*nf_mult, 1, 4, 2))
         modules.append(nn.Conv2d(ndf*nf_mult, ndf*nf_mult, 4, 2))
         modules.append(nn.Conv2d(ndf*nf_mult, 1, 3))
-        if not opt.use_LSGAN:
+        if not (opt.use_LSGAN or opt.use_WGAN):
             modules.append(nn.Sigmoid())
 
         self.D = nn.Sequential(*modules)
@@ -251,7 +251,9 @@ class GFRNet_globalDiscriminator(nn.Module):
 
     def forward(self, x):
         output = self.D(x)
-        return output.view(-1, 1).squeeze(1)
+        # pdb.set_trace()
+        # return output.view(-1, 1).squeeze(1)
+        return output.view(-1)
 
 # GAN Local D
 class GFRNet_localDiscriminator(nn.Module):
@@ -287,14 +289,15 @@ class GFRNet_localDiscriminator(nn.Module):
         modules.append(nn.Conv2d(ndf*nf_mult, ndf*nf_mult, 4, 2))
         modules.append(nn.Conv2d(ndf*nf_mult, 1, 3))
 
-        if not opt.use_LSGAN:
+        if not (opt.use_LSGAN or opt.use_WGAN):
             modules.append(nn.Sigmoid())
 
         self.D = nn.Sequential(*modules)
     
     def forward(self, x):
         output = self.D(x)
-        return output.view(-1, 1).squeeze(1)
+        # return output.view(-1, 1).squeeze(1)
+        return output.view(-1)
 
 # GAN Part D
 class GFRNet_partDiscriminator(nn.Module):
@@ -334,14 +337,15 @@ class GFRNet_partDiscriminator(nn.Module):
         modules.append(nn.Conv2d(ndf*nf_mult, ndf*nf_mult, 4, 2))  # 3x3
         modules.append(nn.Conv2d(ndf*nf_mult, 1, 3))
         
-        if not opt.use_LSGAN:
+        if not (opt.use_LSGAN or opt.use_WGAN):
             modules.append(nn.Sigmoid())
 
         self.D = nn.Sequential(*modules)
     
     def forward(self, x):
         output = self.D(x)
-        return output.view(-1, 1).squeeze(1)
+        # return output.view(-1, 1).squeeze(1)
+        return output.view(-1)
 
 if __name__ == '__main__':
     G = GFRNet_generator()

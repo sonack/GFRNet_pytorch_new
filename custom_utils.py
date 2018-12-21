@@ -60,11 +60,11 @@ def print_inter_grad(msg, avg = None):
         # nonlocal cnt
         if avg:
             avg.add(x.norm().item())
-        # print (msg)
+        print (msg)
         # print (cnt)
         # cnt += 1
         # print ('avg =', avg.mean)
-        # print (x.norm().item())
+        print (x.norm().item())
     return func
 
 
@@ -122,6 +122,10 @@ def calc_gradient_penalty(netD, real_data, fake_data):
     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     return gradient_penalty
 
+
+def debug_info(msg):
+    if opt.debug:
+        print (msg)
 
 if __name__ == '__main__':
     m = Meter()

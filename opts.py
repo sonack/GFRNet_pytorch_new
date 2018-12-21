@@ -128,6 +128,11 @@ parser.add_argument('--gp_lambda', type=float, default=10)
 
 
 
+parser.add_argument('--debug', action='store_true', help='whether to show debug infos')
+
+
+
+
 
 opt = parser.parse_args()
 
