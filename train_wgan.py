@@ -110,7 +110,6 @@ class Runner(object):
             m.reset()
 
 
-
     def train_G(self):
         ############################
         # (2) Update G network
@@ -212,11 +211,6 @@ class Runner(object):
         self.ms['PD_G'].add(PD_G_l.item())
         self.ms['LR_G'].add(LR_G_l.item())
 
-        # displaying
-        if self.i_batch_tot % opt.disp_freq == 0:
-            self.writer.add_image('train/guide-gt-blur-warp-res-local_gt-local_res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_real[:opt.disp_img_cnt], local_fake[:opt.disp_img_cnt]], 2), self.i_batch_tot)
-
-
     def train_Ds(self, end_flag): 
         ############################
         # (1) Update D network
@@ -248,14 +242,15 @@ class Runner(object):
             errGD_D_fake = self.GD_crit(output, label)
         errGD_D_fake.backward()
 
-
         if opt.use_WGAN_GP:
             gp = calc_gradient_penalty(self.GD, real.data, fake.data)
             gp_l = opt.gp_lambda * gp
             gp_l.backward()
 
         if opt.use_WGAN:
-            errGD_D = errGD_D_real - errGD_D_fake
+            # 注意这里是+, 因为errGD_D_fake本身就带有了-号
+            errGD_D = errGD_D_real + errGD_D_fake
+            wasserstein_dis_GD = - errGD_D
             if opt.use_WGAN_GP:
                 errGD_D += gp_l
         else:
@@ -279,17 +274,22 @@ class Runner(object):
             label = torch.full_like(label, noisy_fake_label())
             errLD_D_fake = self.LD_crit(output, label)
         errLD_D_fake.backward()
+        if opt.use_WGAN_GP:
+            gp = calc_gradient_penalty(self.LD, local_real.data, local_fake.data)
+            gp_l = opt.gp_lambda * gp
+            gp_l.backward()
         if opt.use_WGAN:
-            errLD_D = errLD_D_real - errLD_D_fake
+            errLD_D = errLD_D_real + errLD_D_fake
+            wasserstein_dis_LD = - errLD_D
+            if opt.use_WGAN_GP:
+                errLD_D += gp_l
         else:
             errLD_D = (errLD_D_real + errLD_D_fake) / 2
-
-        # pdb.set_trace()
-
         self.optimLD.step()
 
         ## PD
         errsPD_D = []
+        dissPD_D = []
         for p in range(4):
             PD = self.PD[p]
             optimPD = self.optimPD[p] 
@@ -314,15 +314,24 @@ class Runner(object):
                 label = torch.full_like(label, noisy_fake_label())
                 errPD_D_fake = PD_crit(output, label)
             errPD_D_fake.backward()
+            if opt.use_WGAN_GP:
+                gp = calc_gradient_penalty(PD, part_real.data, part_fake.data)
+                gp_l = opt.gp_lambda * gp
+                gp_l.backward()
             if opt.use_WGAN:
-                errPD_D = (errPD_D_real - errPD_D_fake)
+                errPD_D = (errPD_D_real + errPD_D_fake)
+                dis_PD = - errPD_D
+                dissPD_D.append(dis_PD)
+                if opt.use_WGAN_GP:
+                    errPD_D += gp_l
             else:
                 errPD_D = (errPD_D_real + errPD_D_fake) / 2
+            
             errsPD_D.append(errPD_D)
             optimPD.step()
 
         PD_D_l = errsPD_D[0] + errsPD_D[1] + errsPD_D[2] + errsPD_D[3]
-
+        wasserstein_dis_PD = dissPD_D[0] + dissPD_D[1] + dissPD_D[2] + dissPD_D[3]
 
         ## LR
         self.LR.zero_grad()
@@ -342,15 +351,25 @@ class Runner(object):
             label = torch.full_like(label, noisy_fake_label())
             errLR_D_fake = self.LR_crit(output, label)
         errLR_D_fake.backward()
+        if opt.use_WGAN_GP:
+            gp = calc_gradient_penalty(self.LR, LR_real.data, LR_fake.data)
+            gp_l = opt.gp_lambda * gp
+            gp_l.backward()
         if opt.use_WGAN:
-            errLR_D = (errLR_D_real - errLR_D_fake)
+            errLR_D = (errLR_D_real + errLR_D_fake)
+            wasserstein_dis_LR = - errLR_D
+            if opt.use_WGAN_GP:
+                errLR_D += gp_l
         else:
             errLR_D = (errLR_D_real + errLR_D_fake) / 2
         self.optimLR.step()
 
-        for netD in self.models[1:]:
-            for p in netD.parameters():
-                p.data.clamp_(opt.clamp_lower, opt.clamp_upper)
+
+        if opt.use_WGAN and not opt.use_WGAN_GP:
+            print ('Weight Clipping!')
+            for netD in self.models[1:]:
+                for p in netD.parameters():
+                    p.data.clamp_(opt.clamp_lower, opt.clamp_upper)
 
         # logging
         if end_flag:
@@ -360,8 +379,10 @@ class Runner(object):
                 self.ms['PD_D_%c' % p].add(errsPD_D[i].item())
             self.ms['PD_D'].add(PD_D_l.item())
             self.ms['LR_D'].add(errLR_D.item())
-
-        
+            self.ms['GD_dis'].add(wasserstein_dis_GD.item())
+            self.ms['LD_dis'].add(wasserstein_dis_LD.item())
+            self.ms['PD_dis'].add(wasserstein_dis_PD.item())
+            self.ms['LR_dis'].add(wasserstein_dis_LR.item())
 
     def prepare_all_gans_data(self):
         global real, fake, local_real, local_fake, parts_real, parts_fake, LR_real, LR_fake, label, w_gd, grid, res
@@ -415,7 +436,7 @@ class Runner(object):
             #     'p_p': p_p
             # }
             if gen_iterations < 25 or gen_iterations % 500 == 0:
-                Diters = 100
+                Diters = 10
             else:
                 Diters = opt.Diters
 
@@ -459,8 +480,9 @@ class Runner(object):
                     )
                 )
 
+            # displaying
             if self.i_batch_tot % opt.disp_freq == 0:
-                # self.writer.add_image('train/guide-gt-blur-warp-res-local_gt-local_res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_real[:opt.disp_img_cnt], local_fake[:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                self.writer.add_image('train/guide-gt-blur-warp-res-local_gt-local_res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_real[:opt.disp_img_cnt], local_fake[:opt.disp_img_cnt]], 2), self.i_batch_tot)
                 # self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt], parts_real[1][:opt.disp_img_cnt], parts_real[2][:opt.disp_img_cnt], parts_real[3][:opt.disp_img_cnt]], 2), self.i_batch_tot)
                 
                 self.writer.add_scalar('train/mse_loss', self.ms['mse'].mean, self.i_batch_tot)
@@ -478,6 +500,14 @@ class Runner(object):
                 self.writer.add_scalar('train/pt_loss', self.ms['pt'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/tv_loss', self.ms['tv'].mean, self.i_batch_tot)
                 self.writer.add_scalar('train/sym_loss', self.ms['sym'].mean, self.i_batch_tot)
+
+                # wasserstein distance
+                if opt.use_WGAN_GP:
+                    self.writer.add_scalar('train/wasserstein_dis/GD', self.ms['GD_dis'].mean, self.i_batch_tot)
+                    self.writer.add_scalar('train/wasserstein_dis/LD', self.ms['LD_dis'].mean, self.i_batch_tot)
+                    self.writer.add_scalar('train/wasserstein_dis/PD', self.ms['PD_dis'].mean, self.i_batch_tot)
+                    self.writer.add_scalar('train/wasserstein_dis/LR', self.ms['LR_dis'].mean, self.i_batch_tot)
+
 
 
                
@@ -508,8 +538,6 @@ class Runner(object):
         self.writer.add_scalar('train/epoch/mse_loss', self.ms['mse'].mean, cur_e)
         self.writer.add_scalar('train/epoch/perp_loss', self.ms['perp'].mean, cur_e)
         
-
-
     def test(self, cur_e = 0):
         device = self.device
         for i_b, sb in enumerate(self.test_dl):
@@ -587,12 +615,9 @@ class Runner(object):
         self.writer.add_scalar('test/epoch/mse_loss', self.ms['mse'].mean, cur_e)
         self.writer.add_scalar('test/epoch/perp_loss', self.ms['perp'].mean, cur_e)
         
-
-
-
     def prepare_losses(self):
         ms = {}
-        keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D', 'PD_G', 'PD_D', 'PD_D_L', 'PD_D_R', 'PD_D_N', 'PD_D_M', 'LR_G', 'LR_D']
+        keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D', 'PD_G', 'PD_D', 'PD_D_L', 'PD_D_R', 'PD_D_N', 'PD_D_M', 'LR_G', 'LR_D', 'GD_dis', 'LD_dis', 'PD_dis', 'LR_dis']
 
         for key in keys:
             ms[key] = Meter()
@@ -720,11 +745,7 @@ class Runner(object):
             for p in range(4):
                 self.optimPD.append(torch.optim.RMSprop(self.PD[p].parameters(), lr = opt.lr))
             self.optimLR = torch.optim.RMSprop(self.LR.parameters(), lr = opt.lr)
-
-            
-
-       
-
+ 
     def prepare_model(self):
         device = self.device
         self.G = models.GFRNet_generator()
@@ -763,7 +784,6 @@ class Runner(object):
         self.LR.apply(weight_init)
 
         self.models = [self.G, self.GD, self.LD, *self.PD, self.LR]
-
 
     def prepare_data(self):
         train_degradation_tsfm = custom_transforms.DegradationModel(opt.kind)

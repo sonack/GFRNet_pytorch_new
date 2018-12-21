@@ -118,7 +118,7 @@ parser.add_argument('--f2f_kind', type=str, default="l2")
 # GANs
 
 parser.add_argument('--use_WGAN', action='store_true', help='use WGAN(weight clipping) in discriminators')
-parser.add_argument('--use_WGANGP', action='store_true', help='use WGAN(gradient penalty) in discriminators')
+parser.add_argument('--use_WGAN_GP', action='store_true', help='use WGAN(gradient penalty) in discriminators')
 parser.add_argument('--adam', action='store_true', help='whether to use adam (default is rmsprop)')
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
@@ -134,7 +134,7 @@ opt = parser.parse_args()
 if not opt.use_WGAN:
     opt.adam = True
 
-if opt.use_WGANGP:
+if opt.use_WGAN_GP:
     opt.use_WGAN = True
     opt.noBN_D = True
 

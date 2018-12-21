@@ -6,7 +6,7 @@ import math
 import torch
 from opts import opt
 import torch.nn.functional as F
-
+from torch import autograd
 
 class Meter():
     def __init__(self):
@@ -106,28 +106,22 @@ def make_dir(dir_path):
         os.makedirs(dir_path)
 
 # WGAN-GP
+# ref: [https://github.com/caogang/wgan-gp/blob/master/gan_cifar10.py]
 def calc_gradient_penalty(netD, real_data, fake_data):
-    print (real_data.size())
     BATCH_SIZE = real_data.size(0)
+    device = real_data.device
     alpha = torch.rand(BATCH_SIZE, 1)
-    alpha = alpha.expand(real_data.size())
-    alpha = alpha.cuda(gpu) if use_cuda else alpha
+    alpha = alpha.expand(BATCH_SIZE, real_data.nelement() // BATCH_SIZE).contiguous().view(*real_data.size()).to(device)
 
-    interpolates = alpha * real_data + ((1 - alpha) * fake_data)
-
-    if use_cuda:
-        interpolates = interpolates.cuda(gpu)
-    interpolates = autograd.Variable(interpolates, requires_grad=True)
-
+    interpolates = (alpha * real_data + ((1 - alpha) * fake_data)).to(device).requires_grad_()
     disc_interpolates = netD(interpolates)
-
-    gradients = autograd.grad(outputs=disc_interpolates, inputs=interpolates,
-                              grad_outputs=torch.ones(disc_interpolates.size()).cuda(gpu) if use_cuda else torch.ones(
-                                  disc_interpolates.size()),
-                              create_graph=True, retain_graph=True, only_inputs=True)[0]
-
-    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean() * LAMBDA
+    gradients, = autograd.grad(outputs=disc_interpolates, inputs=interpolates,
+                              grad_outputs=torch.ones(disc_interpolates.size()).to(device),
+                              create_graph=True, only_inputs=True)
+    gradients = gradients.view(gradients.size(0), -1)
+    gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     return gradient_penalty
+
 
 if __name__ == '__main__':
     m = Meter()
