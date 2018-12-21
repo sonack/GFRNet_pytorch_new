@@ -215,6 +215,7 @@ class GFRNet_generator(nn.Module):
 class GFRNet_globalDiscriminator(nn.Module):
     def __init__(self, ch_in):
         super(GFRNet_globalDiscriminator, self).__init__()
+        w_bn = not opt.noBN_D
         n_layers = 4
         ndf = 64
 
@@ -228,13 +229,15 @@ class GFRNet_globalDiscriminator(nn.Module):
             nf_mult_prev = nf_mult
             nf_mult = min(2**idx, 8)
             modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
-            modules.append(nn.BatchNorm2d(ndf*nf_mult))
+            if w_bn:
+                modules.append(nn.BatchNorm2d(ndf*nf_mult))
             modules.append(nn.LeakyReLU(0.2))
         
         nf_mult_prev = nf_mult
         nf_mult = min(2**n_layers, 8)
         modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
-        modules.append(nn.BatchNorm2d(ndf*nf_mult))
+        if w_bn:
+            modules.append(nn.BatchNorm2d(ndf*nf_mult))
         modules.append(nn.LeakyReLU(0.2))
 
         # modules.append(nn.Conv2d(ndf*nf_mult, 1, 4, 2))
@@ -254,6 +257,7 @@ class GFRNet_globalDiscriminator(nn.Module):
 class GFRNet_localDiscriminator(nn.Module):
     def __init__(self, ch_in):
         super(GFRNet_localDiscriminator, self).__init__()
+        w_bn = not opt.noBN_D
         n_layers = 4
         ndf = 64
 
@@ -268,13 +272,15 @@ class GFRNet_localDiscriminator(nn.Module):
             nf_mult_prev = nf_mult
             nf_mult = min(2**idx, 8)
             modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
-            modules.append(nn.BatchNorm2d(ndf*nf_mult))
+            if w_bn:
+                modules.append(nn.BatchNorm2d(ndf*nf_mult))
             modules.append(nn.LeakyReLU(0.2))
         
         nf_mult_prev = nf_mult
         nf_mult = min(2**n_layers, 8)
         modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
-        modules.append(nn.BatchNorm2d(ndf*nf_mult))
+        if w_bn:
+            modules.append(nn.BatchNorm2d(ndf*nf_mult))
         modules.append(nn.LeakyReLU(0.2))
 
         # modules.append(nn.Conv2d(ndf*nf_mult, 1, 4, 2))
@@ -294,6 +300,7 @@ class GFRNet_localDiscriminator(nn.Module):
 class GFRNet_partDiscriminator(nn.Module):
     def __init__(self, ch_in):
         super(GFRNet_partDiscriminator, self).__init__()
+        w_bn = not opt.noBN_D
         if opt.part_size == 64:
             n_layers = 2 
         elif opt.part_size == 128:
@@ -312,13 +319,15 @@ class GFRNet_partDiscriminator(nn.Module):
             nf_mult_prev = nf_mult
             nf_mult = min(2**idx, 8)
             modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
-            modules.append(nn.BatchNorm2d(ndf*nf_mult))
+            if w_bn:
+                modules.append(nn.BatchNorm2d(ndf*nf_mult))
             modules.append(nn.LeakyReLU(0.2))
         
         nf_mult_prev = nf_mult
         nf_mult = min(2**n_layers, 8)
         modules.append(nn.Conv2d(ndf*nf_mult_prev, ndf*nf_mult, 4, 2, 1))
-        modules.append(nn.BatchNorm2d(ndf*nf_mult))
+        if w_bn:
+            modules.append(nn.BatchNorm2d(ndf*nf_mult))
         modules.append(nn.LeakyReLU(0.2))
         # 8x8  
         # modules.append(nn.Conv2d(ndf*nf_mult, 1, 4, 2))

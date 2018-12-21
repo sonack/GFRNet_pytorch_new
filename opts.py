@@ -118,15 +118,25 @@ parser.add_argument('--f2f_kind', type=str, default="l2")
 # GANs
 
 parser.add_argument('--use_WGAN', action='store_true', help='use WGAN(weight clipping) in discriminators')
-parser.add_argument('--adam', action='store_true', help='Whether to use adam (default is rmsprop)')
+parser.add_argument('--use_WGANGP', action='store_true', help='use WGAN(gradient penalty) in discriminators')
+parser.add_argument('--adam', action='store_true', help='whether to use adam (default is rmsprop)')
 parser.add_argument('--clamp_lower', type=float, default=-0.01)
 parser.add_argument('--clamp_upper', type=float, default=0.01)
 parser.add_argument('--Diters', type=int, default=5, help='number of D iters per each G iter')
+parser.add_argument('--noBN_D', action='store_true', help='whether to not use batchNorm in Disc')
+parser.add_argument('--gp_lambda', type=float, default=10)
+
+
+
 
 opt = parser.parse_args()
 
 if not opt.use_WGAN:
     opt.adam = True
+
+if opt.use_WGANGP:
+    opt.use_WGAN = True
+    opt.noBN_D = True
 
 if opt.minus_W2:
     opt.minus_W = True

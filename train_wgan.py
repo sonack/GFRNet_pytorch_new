@@ -12,7 +12,7 @@ import custom_transforms
 import dataset
 from torch.utils.data import Dataset, DataLoader
 import models
-from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch, print_inter_grad
+from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch, print_inter_grad, calc_gradient_penalty
 
 from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
@@ -190,10 +190,10 @@ class Runner(object):
         adv_l = GD_G_l + PD_G_l + LD_G_l + LR_G_l
         # adv_l = GD_G_l + LD_G_l
 
-        tot_l = flow_l + rec_l + adv_l
+        # tot_l = flow_l + rec_l + adv_l
         # tot_l = rec_l + adv_l
         # tot_l = rec_l
-        # tot_l = adv_l
+        tot_l = adv_l
 
         self.G.zero_grad()
         tot_l.backward()
@@ -247,8 +247,17 @@ class Runner(object):
             label = torch.full_like(label, noisy_fake_label())
             errGD_D_fake = self.GD_crit(output, label)
         errGD_D_fake.backward()
+
+
+        if opt.use_WGAN_GP:
+            gp = calc_gradient_penalty(self.GD, real.data, fake.data)
+            gp_l = opt.gp_lambda * gp
+            gp_l.backward()
+
         if opt.use_WGAN:
             errGD_D = errGD_D_real - errGD_D_fake
+            if opt.use_WGAN_GP:
+                errGD_D += gp_l
         else:
             errGD_D = (errGD_D_real + errGD_D_fake) / 2
         self.optimGD.step()
@@ -406,12 +415,12 @@ class Runner(object):
             #     'p_p': p_p
             # }
             if gen_iterations < 25 or gen_iterations % 500 == 0:
-                Diters = 10
+                Diters = 100
             else:
                 Diters = opt.Diters
 
-            # for iter_of_d in tqdm(range(Diters)):
-            for iter_of_d in range(Diters):
+            for iter_of_d in tqdm(range(Diters)):
+            # for iter_of_d in range(Diters):
                 self.prepare_all_gans_data()
                 self.train_Ds(end_flag = (iter_of_d == Diters - 1))
 
