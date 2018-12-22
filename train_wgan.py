@@ -26,8 +26,9 @@ from tqdm import tqdm
 real_label = 1
 fake_label = 0
 
-num = 4
-torch.set_num_threads(num)
+if opt.hpc_version:
+    num = 4
+    torch.set_num_threads(num)
 
 def noisy_real_label():
     return random.randint(7, 12) / 10
@@ -186,10 +187,10 @@ class Runner(object):
             errLR_G = self.LR_crit(output, label)
         LR_G_l = opt.lr_l_w * errLR_G
 
-        # adv_l = PD_G_l
+        adv_l = PD_G_l
         # adv_l = GD_G_l + PD_G_l + LD_G_l + LR_G_l
         # adv_l = GD_G_l + LD_G_l
-        adv_l = GD_G_l
+        # adv_l = GD_G_l
         # adv_l = LD_G_l
 
 
