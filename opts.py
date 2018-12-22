@@ -131,6 +131,8 @@ parser.add_argument('--gp_lambda', type=float, default=10)
 parser.add_argument('--debug', action='store_true', help='whether to show debug infos')
 
 
+parser.add_argument('--jpeg_last', action='store_true', help='custom degradation model order: whether to apply jpeg noise at last')
+
 
 
 

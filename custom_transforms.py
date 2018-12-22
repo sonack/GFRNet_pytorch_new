@@ -92,7 +92,6 @@ class DegradationModel(object):
 
     def degradation_kind(self, kind = 'original'):
         if kind == 'original':
-            # self.msg = msg
 
             # self.gaussianBlur_sigma_list = [1 + x * 0.1 for x in range(21)]
             self.gaussianBlur_sigma_list = [1 + x for x in range(3)]
@@ -150,8 +149,12 @@ class DegradationModel(object):
 
 
         
-    def __init__(self, kind = 'original', msg = None):
+    def __init__(self, kind = 'original', jpeg_last = False, msg = None):
        
+
+        # self.msg = msg
+        self.jpeg_last = jpeg_last
+
         self.gaussianBlur_size_list = list(range(3,14,2))
 
         self.degradation_kind(kind)
@@ -178,7 +181,10 @@ class DegradationModel(object):
     def __call__(self, sample):
         # print (self.msg)
         self.random_params()
-        return self.upSampler(self.jpegCompressor(self.awgn(self.downSampler(self.gaussianBlur(sample)))))
+        if self.jpeg_last:
+            return self.jpegCompressor(self.upSampler(self.awgn(self.downSampler(self.gaussianBlur(sample)))))
+        else:
+            return self.upSampler(self.jpegCompressor(self.awgn(self.downSampler(self.gaussianBlur(sample)))))
 
 
 def test_jpeg():
