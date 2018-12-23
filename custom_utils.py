@@ -8,6 +8,13 @@ from opts import opt
 import torch.nn.functional as F
 from torch import autograd
 
+class dotdict(dict):
+    """dot.notation access to dictionary attributes"""
+    __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+
 class Meter():
     def __init__(self):
         self.reset()
@@ -112,7 +119,7 @@ def calc_gradient_penalty(netD, real_data, fake_data):
     device = real_data.device
     alpha = torch.rand(BATCH_SIZE, 1)
     alpha = alpha.expand(BATCH_SIZE, real_data.nelement() // BATCH_SIZE).contiguous().view(*real_data.size()).to(device)
-
+    # pdb.set_trace()
     interpolates = (alpha * real_data + ((1 - alpha) * fake_data)).to(device).requires_grad_()
     disc_interpolates = netD(interpolates)
     gradients, = autograd.grad(outputs=disc_interpolates, inputs=interpolates,
@@ -122,6 +129,21 @@ def calc_gradient_penalty(netD, real_data, fake_data):
     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
     return gradient_penalty
 
+
+# def calc_gradient_penalty_mnist(netD, real_data, fake_data):
+#     BATCH_SIZE = real_data.size(0)
+#     device = real_data.device
+#     alpha = torch.rand(BATCH_SIZE, 1)
+#     alpha = alpha.expand(real_data.size()).to(device)
+
+#     interpolates = (alpha * real_data + ((1 - alpha) * fake_data)).to(device).requires_grad_()
+#     disc_interpolates = netD(interpolates)
+#     gradients, = autograd.grad(outputs=disc_interpolates, inputs=interpolates,
+#                               grad_outputs=torch.ones(disc_interpolates.size()).to(device),
+#                               create_graph=True, only_inputs=True)
+#     gradients = gradients.view(gradients.size(0), -1)
+#     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
+#     return gradient_penalty
 
 def debug_info(msg):
     if opt.debug:

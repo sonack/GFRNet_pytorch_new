@@ -12,7 +12,7 @@ import custom_transforms
 import dataset
 from torch.utils.data import Dataset, DataLoader
 import models
-from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch, print_inter_grad, calc_gradient_penalty, debug_info
+from custom_utils import weight_init, create_orig_xy_map, Meter, make_face_region_batch, make_parts_region_batch, print_inter_grad, calc_gradient_penalty, debug_info, dotdict, calc_gradient_penalty_mnist
 
 from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
@@ -22,19 +22,28 @@ import pdb
 import time
 from tqdm import tqdm
 import torchvision.datasets as datasets
-
-real_label = 1
-fake_label = 0
+import numpy as np
+import validator_models as v_models
 
 if opt.hpc_version:
     num = 4
     torch.set_num_threads(num)
+
+real_label = 1
+fake_label = 0
 
 def noisy_real_label():
     return random.randint(7, 12) / 10
 
 def noisy_fake_label():
     return random.randint(0, 3) / 10
+
+# 单独为 validator gan 设置的超参
+config = {
+    'nz': 128, # size of the latent z vector
+}
+
+config = dotdict(config)
 
 
 class Runner(object):
@@ -96,9 +105,9 @@ class Runner(object):
             self.reset_ms()
             self.train_one_epoch(e)
 
-            self.change_model_mode(False)
-            self.reset_ms()
-            self.test(e)
+            # self.change_model_mode(False)
+            # self.reset_ms()
+            # self.test(e)
             
             if (e + 1) % opt.save_epoch_freq == 0:
                 self.save_checkpoint(e)
@@ -129,7 +138,7 @@ class Runner(object):
         # print (gd.shape)
         # pdb.set_trace()
 
-
+        '''
         pt_l = opt.pt_l_w * self.point_crit(grid, lm_gt, lm_mask)
         tv_l = opt.tv_l_w * self.tv_crit(grid - self.orig_xy_map)
         sym_l = torch.Tensor([0]).to(device)
@@ -143,15 +152,23 @@ class Runner(object):
         perp_l = opt.perp_l_w * self.perp_crit(res, gt)
 
         rec_l = perp_l + mse_l
-
+        
 
         # grid.register_hook(grid_grad_func)
         # self.G.recNet.encoder[0].weight.register_hook(inter_grad_func)
 
+        
         if opt.debug:
             res.register_hook(print_inter_grad("rec tensor grad"))
+        '''
+        output = self.D(fake)
+        if opt.use_WGAN:
+            err_G = output.mean()
+        else:
+            err_G = self.D_crit(output, label)
+        G_l = err_G
 
-
+        '''
         # gan loss
         ## Global GAN
         output = self.GD(fake)
@@ -187,7 +204,9 @@ class Runner(object):
             errLR_G = self.LR_crit(output, label)
         LR_G_l = opt.lr_l_w * errLR_G
 
-        adv_l = PD_G_l
+        '''
+        adv_l = G_l
+        # adv_l = PD_G_l
         # adv_l = GD_G_l + PD_G_l + LD_G_l + LR_G_l
         # adv_l = GD_G_l + LD_G_l
         # adv_l = GD_G_l
@@ -205,16 +224,17 @@ class Runner(object):
 
 
         # logging
-        self.ms['pt'].add(pt_l.item())
-        self.ms['tv'].add(tv_l.item())
-        self.ms['sym'].add(sym_l.item())
-        self.ms['tot'].add(tot_l.item())
-        self.ms['mse'].add(mse_l.item())
-        self.ms['perp'].add(perp_l.item())
-        self.ms['GD_G'].add(GD_G_l.item())
-        self.ms['LD_G'].add(LD_G_l.item())
-        self.ms['PD_G'].add(PD_G_l.item())
-        self.ms['LR_G'].add(LR_G_l.item())
+        # self.ms['pt'].add(pt_l.item())
+        # self.ms['tv'].add(tv_l.item())
+        # self.ms['sym'].add(sym_l.item())
+        # self.ms['tot'].add(tot_l.item())
+        # self.ms['mse'].add(mse_l.item())
+        # self.ms['perp'].add(perp_l.item())
+        # self.ms['GD_G'].add(GD_G_l.item())
+        # self.ms['LD_G'].add(LD_G_l.item())
+        # self.ms['PD_G'].add(PD_G_l.item())
+        # self.ms['LR_G'].add(LR_G_l.item())
+        self.ms['G'].add(G_l.item())
 
     def train_Ds(self, end_flag): 
         ############################
@@ -224,7 +244,45 @@ class Runner(object):
         for netD in self.models[1:]:
             for p in netD.parameters():
                 p.requires_grad = True
-        
+        ## D
+        ### train with real
+        self.D.zero_grad()
+        output = self.D(real)
+        # pdb.set_trace()
+        if opt.use_WGAN:
+            err_D_real = output.mean()
+        else:
+            label = torch.full_like(label, noisy_real_label())
+            err_D_real = self.D_crit(output, label)
+        # pdb.set_trace()
+        err_D_real.backward()
+
+        ### train with fake
+        output = self.D(fake.detach())
+        if opt.use_WGAN:
+            err_D_fake = output.mean() * (-1)
+        else:
+            label = torch.full_like(label, noisy_fake_label())
+            err_D_fake = self.D_crit(output, label)
+        err_D_fake.backward()
+
+        if opt.use_WGAN_GP:
+            # gp = calc_gradient_penalty(self.D, real.data, fake.data)
+            gp = calc_gradient_penalty_mnist(self.D, real.data, fake.data)
+            gp_l = opt.gp_lambda * gp
+            gp_l.backward()
+
+        if opt.use_WGAN:
+            # 注意这里是+, 因为errGD_D_fake本身就带有了-号
+            err_D = err_D_real + err_D_fake
+            wasserstein_dis = - err_D
+            if opt.use_WGAN_GP:
+                err_D += gp_l
+        else:
+            err_D = (err_D_real + err_D_fake) / 2
+        self.optimD.step()
+
+        '''    
         ## GD
         ### train with real
         self.GD.zero_grad()
@@ -369,7 +427,7 @@ class Runner(object):
             errLR_D = (errLR_D_real + errLR_D_fake) / 2
         self.optimLR.step()
 
-
+        '''
         if opt.use_WGAN and not opt.use_WGAN_GP:
             debug_info ('Weight Clipping!')
             for netD in self.models[1:]:
@@ -378,19 +436,25 @@ class Runner(object):
 
         # logging
         if end_flag:
-            self.ms['GD_D'].add(errGD_D.item())
-            self.ms['LD_D'].add(errLD_D.item())
-            for i, p in enumerate(['L', 'R', 'N', 'M']):
-                self.ms['PD_D_%c' % p].add(errsPD_D[i].item())
-            self.ms['PD_D'].add(PD_D_l.item())
-            self.ms['LR_D'].add(errLR_D.item())
-            self.ms['GD_dis'].add(wasserstein_dis_GD.item())
-            self.ms['LD_dis'].add(wasserstein_dis_LD.item())
-            self.ms['PD_dis'].add(wasserstein_dis_PD.item())
-            self.ms['LR_dis'].add(wasserstein_dis_LR.item())
+            # self.ms['GD_D'].add(errGD_D.item())
+            # self.ms['LD_D'].add(errLD_D.item())
+            # for i, p in enumerate(['L', 'R', 'N', 'M']):
+            #     self.ms['PD_D_%c' % p].add(errsPD_D[i].item())
+            # self.ms['PD_D'].add(PD_D_l.item())
+            # self.ms['LR_D'].add(errLR_D.item())
+            # self.ms['GD_dis'].add(wasserstein_dis_GD.item())
+            # self.ms['LD_dis'].add(wasserstein_dis_LD.item())
+            # self.ms['PD_dis'].add(wasserstein_dis_PD.item())
+            # self.ms['LR_dis'].add(wasserstein_dis_LR.item())
+            self.ms['D'].add(err_D.item())
+            self.ms['dis'].add(wasserstein_dis.item())
 
     def prepare_all_gans_data(self):
-        global real, fake, local_real, local_fake, parts_real, parts_fake, LR_real, LR_fake, label, w_gd, grid, res
+        # global real, fake, local_real, local_fake, parts_real, parts_fake, LR_real, LR_fake, label, w_gd, grid, res
+        global fake
+       
+        fake = self.G(noise)
+        '''
         w_gd, grid, res = self.G(bl, gd)
         d = {
             'gt': gt,
@@ -407,6 +471,7 @@ class Runner(object):
         local_real, local_fake = self.prepare_gan_pair_data(d, 'local3')
         parts_real, parts_fake = self.prepare_gan_pair_data(d, 'part%d' % opt.PD_cond)
         LR_real, LR_fake = self.prepare_gan_pair_data(d, 'LR')
+        '''
 
     # one epoch train
     def train_one_epoch(self, cur_e = 0):
@@ -423,14 +488,20 @@ class Runner(object):
         for i_b, sb in enumerate(self.train_dl):
             # if i_b > 100:
             #     break
-            global gd, bl, gt, lm_mask, lm_gt, f_r, p_p
-            gd = sb['guide'].to(device)
-            bl = sb['blur'].to(device)
-            gt = sb['gt'].to(device)
-            lm_mask = sb['lm_mask'].to(device)
-            lm_gt = sb['lm_gt'].to(device)
-            f_r = sb['face_region_calc']
-            p_p = sb['part_pos']
+            # pdb.set_trace()
+            # global gd, bl, gt, lm_mask, lm_gt, f_r, p_p
+            global real, noise
+            real, _ = sb
+            real = real.view(-1, 28*28).to(device)
+
+            noise = torch.randn(opt.batch_size, config.nz).to(device)
+            # gd = sb['guide'].to(device)
+            # bl = sb['blur'].to(device)
+            # gt = sb['gt'].to(device)
+            # lm_mask = sb['lm_mask'].to(device)
+            # lm_gt = sb['lm_gt'].to(device)
+            # f_r = sb['face_region_calc']
+            # p_p = sb['part_pos']
 
             # self.pack = {
             #     'gd': gd,
@@ -465,6 +536,7 @@ class Runner(object):
             gen_iterations += 1
             self.i_batch_tot += 1
 
+            '''
             # printing
             if i_b % opt.print_freq == 0:
                 # print ('[%d] inter grad tensor grad scale is' % i_b, inter_grad_meter.mean)
@@ -491,9 +563,26 @@ class Runner(object):
                     self.ms['tot'].mean,
                     )
                 )
+            '''
+
+            if i_b % opt.print_freq == 0:
+                print ('[Train]: %s [%d/%d] (%d/%d) <%d>\tGAN Loss: [%.12f/%.12f]\tWasserstein Distance: %.12f' % (
+                    time.strftime("%m-%d %H:%M:%S", time.localtime()),
+                    cur_e,
+                    opt.max_epoch,
+                    i_b,
+                    self.train_BNPE,
+                    gen_iterations,
+                    self.ms['G'].mean,
+                    self.ms['D'].mean,
+                    self.ms['dis'].mean
+                    )
+                )
 
             # displaying
             if self.i_batch_tot % opt.disp_freq == 0:
+                self.writer.add_image('train/real-fake', torch.cat([real.view(-1, 1, 28, 28)[:opt.disp_img_cnt], fake.view(-1, 1, 28, 28)[:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                '''
                 self.writer.add_image('train/guide-gt-blur-warp-res-local_gt-local_res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_real[:opt.disp_img_cnt], local_fake[:opt.disp_img_cnt]], 2), self.i_batch_tot)
                 # self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt], parts_real[1][:opt.disp_img_cnt], parts_real[2][:opt.disp_img_cnt], parts_real[3][:opt.disp_img_cnt]], 2), self.i_batch_tot)
                 
@@ -519,12 +608,14 @@ class Runner(object):
                     self.writer.add_scalar('train/wasserstein_dis/LD', self.ms['LD_dis'].mean, self.i_batch_tot)
                     self.writer.add_scalar('train/wasserstein_dis/PD', self.ms['PD_dis'].mean, self.i_batch_tot)
                     self.writer.add_scalar('train/wasserstein_dis/LR', self.ms['LR_dis'].mean, self.i_batch_tot)
-
-
-
-               
+                '''
+                self.writer.add_scalar('train/G', self.ms['G'].mean, self.i_batch_tot)
+                self.writer.add_scalar('train/D', self.ms['D'].mean, self.i_batch_tot)
+                if opt.use_WGAN_GP:
+                    self.writer.add_scalar('train/wasserstein_dis', self.ms['dis'].mean, self.i_batch_tot)
 
         print ('*' * 30)
+        '''
         print ('[Train]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tGD Loss: [%.12f/%.12f]\tLD Loss: [%.12f/%.12f]\tPD Loss: [%.12f/%.12f]\tLR Loss: [%.12f/%.12f]\tTot Loss=%.12f' % (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
                     cur_e,
@@ -545,10 +636,26 @@ class Runner(object):
                     self.ms['tot'].mean,
                     )
                 )
+        '''
+        print ('[Train]: %s [%d/%d]\tGAN Loss: [%.12f/%.12f]\tWasserstein Distance: %.12f' % (
+                    time.strftime("%m-%d %H:%M:%S", time.localtime()),
+                    cur_e,
+                    opt.max_epoch,
+                    self.ms['G'].mean,
+                    self.ms['D'].mean,
+                    self.ms['dis'].mean
+                    )
+                )
         print ('*' * 30)
 
-        self.writer.add_scalar('train/epoch/mse_loss', self.ms['mse'].mean, cur_e)
-        self.writer.add_scalar('train/epoch/perp_loss', self.ms['perp'].mean, cur_e)
+        # self.writer.add_scalar('train/epoch/mse_loss', self.ms['mse'].mean, cur_e)
+        # self.writer.add_scalar('train/epoch/perp_loss', self.ms['perp'].mean, cur_e)
+
+        self.writer.add_scalar('train/epoch/G', self.ms['G'].mean, cur_e)
+        self.writer.add_scalar('train/epoch/D', self.ms['G'].mean, cur_e)
+        self.writer.add_scalar('train/epoch/wasserstein_dis', self.ms['dis'].mean, cur_e)
+
+
         
     def test(self, cur_e = 0):
         device = self.device
@@ -629,7 +736,8 @@ class Runner(object):
         
     def prepare_losses(self):
         ms = {}
-        keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D', 'PD_G', 'PD_D', 'PD_D_L', 'PD_D_R', 'PD_D_N', 'PD_D_M', 'LR_G', 'LR_D', 'GD_dis', 'LD_dis', 'PD_dis', 'LR_dis']
+        # keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D', 'PD_G', 'PD_D', 'PD_D_L', 'PD_D_R', 'PD_D_N', 'PD_D_M', 'LR_G', 'LR_D', 'GD_dis', 'LD_dis', 'PD_dis', 'LR_dis']
+        keys = ['G', 'D', 'dis']
 
         for key in keys:
             ms[key] = Meter()
@@ -646,14 +754,15 @@ class Runner(object):
 
 
         if not opt.use_WGAN:
-            self.GD_crit = nn.BCELoss()
-            self.LD_crit = nn.BCELoss()
+            # self.GD_crit = nn.BCELoss()
+            # self.LD_crit = nn.BCELoss()
 
-            self.PD_crit = []
-            for p in range(4):
-                self.PD_crit.append(nn.BCELoss())
+            # self.PD_crit = []
+            # for p in range(4):
+            #     self.PD_crit.append(nn.BCELoss())
 
-            self.LR_crit = nn.BCELoss()
+            # self.LR_crit = nn.BCELoss()
+            self.D_crit = nn.BCELoss()
         
     def load_checkpoint(self):
         if not (opt.load_checkpoint or opt.load_warpnet):
@@ -727,103 +836,118 @@ class Runner(object):
         if opt.adam:
             # print ('Enable adam!')
             betas = (opt.beta1, 0.999)
-            self.optim = torch.optim.Adam(
-                [
-                    { 'params': self.G.warpNet.parameters(), 'lr': opt.lr * 0.001 },
-                    { 'params': self.G.recNet.parameters() }
-                ],
-                lr = opt.lr,
-                betas = betas
-            )
-            self.optimGD = torch.optim.Adam(self.GD.parameters(), lr = opt.lr, betas = betas)
-            self.optimLD = torch.optim.Adam(self.LD.parameters(), lr = opt.lr, betas = betas)
-            self.optimPD = []
-            for p in range(4):
-                self.optimPD.append(torch.optim.Adam(self.PD[p].parameters(), lr = opt.lr, betas = betas))
-            self.optimLR = torch.optim.Adam(self.LR.parameters(), lr = opt.lr, betas = betas)
+            self.optim = torch.optim.Adam(self.G.parameters(), lr = opt.lr, betas = betas)
+            self.optimD = torch.optim.Adam(self.D.parameters(), lr = opt.lr, betas = betas)
+            # self.optim = torch.optim.Adam(
+            #     [
+            #         { 'params': self.G.warpNet.parameters(), 'lr': opt.lr * 0.001 },
+            #         { 'params': self.G.recNet.parameters() }
+            #     ],
+            #     lr = opt.lr,
+            #     betas = betas
+            # )
+            # self.optimGD = torch.optim.Adam(self.GD.parameters(), lr = opt.lr, betas = betas)
+            # self.optimLD = torch.optim.Adam(self.LD.parameters(), lr = opt.lr, betas = betas)
+            # self.optimPD = []
+            # for p in range(4):
+            #     self.optimPD.append(torch.optim.Adam(self.PD[p].parameters(), lr = opt.lr, betas = betas))
+            # self.optimLR = torch.optim.Adam(self.LR.parameters(), lr = opt.lr, betas = betas)
         else: # RMSProp
             # print ('Enable RMSProp!')
-            self.optim = torch.optim.RMSprop(
-                [
-                    { 'params': self.G.warpNet.parameters(), 'lr': opt.lr * 0.001 },
-                    { 'params': self.G.recNet.parameters() }
-                ],
-                lr = opt.lr,
-                # betas = betas
-            )
-            self.optimGD = torch.optim.RMSprop(self.GD.parameters(), lr = opt.lr)
-            self.optimLD = torch.optim.RMSprop(self.LD.parameters(), lr = opt.lr)
-            self.optimPD = []
-            for p in range(4):
-                self.optimPD.append(torch.optim.RMSprop(self.PD[p].parameters(), lr = opt.lr))
-            self.optimLR = torch.optim.RMSprop(self.LR.parameters(), lr = opt.lr)
+            self.optim = torch.optim.RMSprop(self.G.parameters(), lr = opt.lr)
+            self.optimD = torch.optim.RMSprop(self.D.parameters(), lr = opt.lr)
+            # self.optim = torch.optim.RMSprop(
+            #     [
+            #         { 'params': self.G.warpNet.parameters(), 'lr': opt.lr * 0.001 },
+            #         { 'params': self.G.recNet.parameters() }
+            #     ],
+            #     lr = opt.lr,
+            #     # betas = betas
+            # )
+            # self.optimGD = torch.optim.RMSprop(self.GD.parameters(), lr = opt.lr)
+            # self.optimLD = torch.optim.RMSprop(self.LD.parameters(), lr = opt.lr)
+            # self.optimPD = []
+            # for p in range(4):
+            #     self.optimPD.append(torch.optim.RMSprop(self.PD[p].parameters(), lr = opt.lr))
+            # self.optimLR = torch.optim.RMSprop(self.LR.parameters(), lr = opt.lr)
  
     def prepare_model(self):
         device = self.device
-        self.G = models.GFRNet_generator()
+        self.G = v_models.MNIST_Generator()
+        # self.G = models.GFRNet_generator()
         self.G.to(device)
         self.G.apply(weight_init)
 
-        # 3 uncond
-        # 6 [w_gd, res/gt]
-        # 9 [w_gd, gd, res/gt]
-        self.GD = models.GFRNet_globalDiscriminator(opt.GD_cond)
-        self.GD.to(device)
-        self.GD.apply(weight_init)
+
+        self.D = v_models.MNIST_Discriminator()
+        self.D.to(device)
+        self.D.apply(weight_init)
+
+        # # 3 uncond
+        # # 6 [w_gd, res/gt]
+        # # 9 [w_gd, gd, res/gt]
+        # self.GD = models.GFRNet_globalDiscriminator(opt.GD_cond)
+        # self.GD.to(device)
+        # self.GD.apply(weight_init)
 
 
-        self.LD = models.GFRNet_localDiscriminator(3)
-        self.LD.to(device)
-        self.LD.apply(weight_init)
+        # self.LD = models.GFRNet_localDiscriminator(3)
+        # self.LD.to(device)
+        # self.LD.apply(weight_init)
 
 
-        # part Ds
-        # [L, R, N, M]
-        # cond
-        # 3 uncond
-        # 6 [w_gd, res/gt]
-        self.PD = []
-        for p in range(4):
-            self.PD.append(models.GFRNet_partDiscriminator(opt.PD_cond))
+        # # part Ds
+        # # [L, R, N, M]
+        # # cond
+        # # 3 uncond
+        # # 6 [w_gd, res/gt]
+        # self.PD = []
+        # for p in range(4):
+        #     self.PD.append(models.GFRNet_partDiscriminator(opt.PD_cond))
         
-        for pd in self.PD:
-            pd.to(device)
-            pd.apply(weight_init)
+        # for pd in self.PD:
+        #     pd.to(device)
+        #     pd.apply(weight_init)
         
-        # [L, R]
-        self.LR = models.GFRNet_partDiscriminator(6)
-        self.LR.to(device)
-        self.LR.apply(weight_init)
+        # # [L, R]
+        # self.LR = models.GFRNet_partDiscriminator(6)
+        # self.LR.to(device)
+        # self.LR.apply(weight_init)
 
-        self.models = [self.G, self.GD, self.LD, *self.PD, self.LR]
+        # self.models = [self.G, self.GD, self.LD, *self.PD, self.LR]
+        self.models = [self.G, self.D]
 
     def prepare_data(self):
-        mnist_trainset = datasets.MNIST(root='./playground/validator_data/mnist', train=True, downdload=True, transform=None)
-        pdb.set_trace()
+        mnist_trainset = datasets.MNIST(root='./playground/validator_data/mnist', train=True, download=False, transform=transforms.Compose([
+            transforms.ToTensor()
+        ]))
+        # a = np.array(mnist_trainset[0][0])
+        # pdb.set_trace()
 
-        train_degradation_tsfm = custom_transforms.DegradationModel(opt.kind, opt.jpeg_last)
-        test_degradation_tsfm = custom_transforms.DegradationModel(opt.kind, opt.jpeg_last)
+        # train_degradation_tsfm = custom_transforms.DegradationModel(opt.kind, opt.jpeg_last)
+        # test_degradation_tsfm = custom_transforms.DegradationModel(opt.kind, opt.jpeg_last)
         # train_degradation_tsfm = custom_transforms.DegradationModel("train degradation")
         # test_degradation_tsfm = custom_transforms.DegradationModel("test degradation")
-        to_tensor_tsfm = custom_transforms.ToTensor()
-        train_tsfms = [
-            train_degradation_tsfm,
-            to_tensor_tsfm
-        ]
-        test_tsfms = [
-            test_degradation_tsfm,
-            to_tensor_tsfm
-        ]
-        train_tsfm_c = transforms.Compose(train_tsfms)
-        test_tsfm_c = transforms.Compose(test_tsfms)
+        # to_tensor_tsfm = custom_transforms.ToTensor()
+        # train_tsfms = [
+        #     train_degradation_tsfm,
+        #     to_tensor_tsfm
+        # ]
+        # test_tsfms = [
+        #     test_degradation_tsfm,
+        #     to_tensor_tsfm
+        # ]
+        # train_tsfm_c = transforms.Compose(train_tsfms)
+        # test_tsfm_c = transforms.Compose(test_tsfms)
         
-        self.train_dataset = dataset.FaceDataset(opt.train_img_dir, opt.train_landmark_dir, opt.train_sym_dir, opt.train_mask_dir, opt.face_masks_dir, opt.flip_prob, train_tsfm_c, False)
+        # self.train_dataset = dataset.FaceDataset(opt.train_img_dir, opt.train_landmark_dir, opt.train_sym_dir, opt.train_mask_dir, opt.face_masks_dir, opt.flip_prob, train_tsfm_c, False)
+        self.train_dataset = mnist_trainset
         self.train_dl = DataLoader(self.train_dataset, batch_size = opt.batch_size, shuffle = True, num_workers = opt.num_workers)
         self.train_BNPE = len(self.train_dl)
 
-        self.test_dataset = dataset.FaceDataset(opt.test_img_dir, opt.test_landmark_dir, opt.test_sym_dir, opt.test_mask_dir, opt.face_masks_dir, -1, test_tsfm_c, True)
-        self.test_dl = DataLoader(self.test_dataset, batch_size = opt.batch_size, shuffle = False, num_workers = opt.num_workers)
-        self.test_BNPE = len(self.test_dl)
+        # self.test_dataset = dataset.FaceDataset(opt.test_img_dir, opt.test_landmark_dir, opt.test_sym_dir, opt.test_mask_dir, opt.face_masks_dir, -1, test_tsfm_c, True)
+        # self.test_dl = DataLoader(self.test_dataset, batch_size = opt.batch_size, shuffle = False, num_workers = opt.num_workers)
+        # self.test_BNPE = len(self.test_dl)
 
     def startup(self):
         # random seed

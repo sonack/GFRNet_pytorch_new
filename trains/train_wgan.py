@@ -49,6 +49,9 @@ class Runner(object):
         self.prepare_losses()
         self.load_checkpoint()
 
+        if opt.debug:
+            self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
+
     def __del__(self):
         self.writer.close()
     
@@ -417,8 +420,7 @@ class Runner(object):
 
         # inter_grad_meter = Meter()
         # inter_grad_func = print_inter_grad("recNet encoder[0].weight grad", inter_grad_meter)
-        if opt.debug:
-            self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
+        
         
         for i_b, sb in enumerate(self.train_dl):
             # if i_b > 100:
