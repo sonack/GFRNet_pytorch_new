@@ -149,3 +149,134 @@ class CIFAR10_Discriminator(nn.Module):
         output = output.view(-1, 4*4*4*DIM)
         output = self.linear(output)
         return output
+
+
+# Anime Avatar
+# ref: [https://github.com/chenyuntc/pytorch-book/blob/master/chapter7-GAN%E7%94%9F%E6%88%90%E5%8A%A8%E6%BC%AB%E5%A4%B4%E5%83%8F/model.py]
+
+
+from custom_utils import dotdict
+opt = {
+    'nz': 128,
+    'ngf': 64,
+    'ndf': 64,
+}
+
+opt = dotdict(opt)
+
+class ANIME_Generator(nn.Module):
+    """
+    生成器定义
+    """
+    def __init__(self):
+        super(ANIME_Generator, self).__init__()
+        ngf = opt.ngf  # 生成器feature map数
+
+        self.main = nn.Sequential(
+            # 输入是一个nz维度的噪声，我们可以认为它是一个1*1*nz的feature map
+            nn.ConvTranspose2d(opt.nz, ngf * 8, 4, 1, 0, bias=False),
+            nn.BatchNorm2d(ngf * 8),
+            nn.ReLU(True),
+            # 上一步的输出形状：(ngf*8) x 4 x 4
+
+            nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+            # 上一步的输出形状： (ngf*4) x 8 x 8
+
+            nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf * 2),
+            nn.ReLU(True),
+            # 上一步的输出形状： (ngf*2) x 16 x 16
+
+            nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ngf),
+            nn.ReLU(True),
+            # 上一步的输出形状：(ngf) x 32 x 32
+
+            nn.ConvTranspose2d(ngf, 3, 5, 3, 1, bias=False),
+            nn.Tanh()  # 输出范围 -1~1 故而采用Tanh
+            # 输出形状：3 x 96 x 96
+        )
+
+    def forward(self, input):
+        input = input.view(-1, opt.nz, 1, 1)
+        return self.main(input)
+
+
+class ANIME_Discriminator(nn.Module):
+    """
+    判别器定义
+    """
+    def __init__(self):
+        super(ANIME_Discriminator, self).__init__()
+        ndf = opt.ndf
+        self.main = nn.Sequential(
+            # 输入 3 x 96 x 96
+            nn.Conv2d(3, ndf, 5, 3, 1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True),
+            # 输出 (ndf) x 32 x 32
+
+            nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 2),
+            nn.LeakyReLU(0.2, inplace=True),
+            # 输出 (ndf*2) x 16 x 16
+
+            nn.Conv2d(ndf * 2, ndf * 4, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 4),
+            nn.LeakyReLU(0.2, inplace=True),
+            # 输出 (ndf*4) x 8 x 8
+
+            nn.Conv2d(ndf * 4, ndf * 8, 4, 2, 1, bias=False),
+            nn.BatchNorm2d(ndf * 8),
+            nn.LeakyReLU(0.2, inplace=True),
+            # 输出 (ndf*8) x 4 x 4
+
+            nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
+            nn.Sigmoid()  # 输出一个数(概率)
+        )
+
+    def forward(self, input):
+        return self.main(input).view(-1)
+
+
+
+# class ANIME_Generator_v2(nn.Module):
+#     """
+#     生成器定义
+#     """
+#     def __init__(self):
+#         super(ANIME_Generator, self).__init__()
+#         ngf = opt.ngf  # 生成器feature map数
+
+#         self.main = nn.Sequential(
+#             # 输入是一个nz维度的噪声，我们可以认为它是一个1*1*nz的feature map
+#             nn.ConvTranspose2d(opt.nz, ngf * 8, 4, 1, 0, bias=False),
+#             nn.BatchNorm2d(ngf * 8),
+#             nn.ReLU(True),
+#             # 上一步的输出形状：(ngf*8) x 4 x 4
+
+#             nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf * 4),
+#             nn.ReLU(True),
+#             # 上一步的输出形状： (ngf*4) x 8 x 8
+
+#             nn.ConvTranspose2d(ngf * 4, ngf * 2, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf * 2),
+#             nn.ReLU(True),
+#             # 上一步的输出形状： (ngf*2) x 16 x 16
+
+#             nn.ConvTranspose2d(ngf * 2, ngf, 4, 2, 1, bias=False),
+#             nn.BatchNorm2d(ngf),
+#             nn.ReLU(True),
+#             # 上一步的输出形状：(ngf) x 32 x 32
+
+#             nn.ConvTranspose2d(ngf, 3, 5, 3, 1, bias=False),
+#             nn.Tanh()  # 输出范围 -1~1 故而采用Tanh
+#             # 输出形状：3 x 96 x 96
+#         )
+
+#     def forward(self, input):
+#         # input = input.view(-1, opt.nz, 1, 1)
+
+#         return self.main(input)

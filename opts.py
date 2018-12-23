@@ -104,7 +104,6 @@ parser.add_argument('--PD_cond', type=int, default=3, help='3: uncond, 6: [w_gd,
 
 
 parser.add_argument('--hpc_version', action='store_true', help='use on HPC servers')
-parser.add_argument('--use_resize_conv', action='store_true', help='use resize conv in Generator recNet')
 parser.add_argument('--train_mask_dir', type=str, default=None)
 parser.add_argument('--test_mask_dir', type=str, default=None)
 
@@ -133,10 +132,16 @@ parser.add_argument('--debug', action='store_true', help='whether to show debug 
 
 parser.add_argument('--jpeg_last', action='store_true', help='custom degradation model order: whether to apply jpeg noise at last')
 
+parser.add_argument('--use_resize_conv', action='store_true', help='use resize conv in Generator recNet, [deprecated, use deconv_kind instead]')
+parser.add_argument('--deconv_kind', type=str, default='deconv', help='the vanilla deconv alternatives ( deconv | resize | subpixel )')
 
+parser.add_argument('--skip_train_D', action='store_true', help='enable this when you just wanna only train G, i.e. no GAN loss is applied')
 
 
 opt = parser.parse_args()
+
+if opt.use_resize_conv:
+    opt.deconv_kind = 'resize'
 
 if not opt.use_WGAN:
     opt.adam = True

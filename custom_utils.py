@@ -52,7 +52,8 @@ def weight_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
         m.weight.data.normal_(0.0, 0.02)
-        m.bias.data.fill_(0)
+        if m.bias:
+            m.bias.data.fill_(0)
     elif classname.find('BatchNorm') != -1:
         m.weight.data.normal_(1.0, 0.02)
         m.bias.data.fill_(0)
@@ -145,9 +146,9 @@ def calc_gradient_penalty(netD, real_data, fake_data):
 #     gradient_penalty = ((gradients.norm(2, dim=1) - 1) ** 2).mean()
 #     return gradient_penalty
 
-def debug_info(msg):
+def debug_info(*msg):
     if opt.debug:
-        print (msg)
+        print (*msg)
 
 if __name__ == '__main__':
     m = Meter()

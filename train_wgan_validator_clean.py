@@ -41,8 +41,13 @@ def noisy_fake_label():
 # 单独为 validator gan 设置的超参
 config = {
     'nz': 128, # size of the latent z vector
-    # 'dataset': 'mnist', # 'mnist', 'cifar10'
-    'dataset': 'cifar10',
+    'max_imgs_to_show': 80,
+
+    # 'dataset': 'mnist', # 'mnist', 'cifar10', 'anime'
+    # 'dataset': 'cifar10',
+    'dataset': 'anime',
+
+    
 }
 
 config = dotdict(config)
@@ -68,8 +73,6 @@ class Runner(object):
     
 
     def run(self):
-        global gen_iterations
-        gen_iterations = 0
         for e in range(self.last_epoch + 1, opt.max_epoch):
             self.change_model_mode(True)
             self.reset_ms()
@@ -86,6 +89,9 @@ class Runner(object):
 
 
     def train_G(self):
+        global noise, fake, label
+        label = torch.full_like(label, real_label)
+
         ############################
         # (2) Update G network
         ###########################
@@ -93,8 +99,10 @@ class Runner(object):
         # to avoid computation
         for netD in self.models[1:]:
             for p in netD.parameters():
-                p.requires_grad = False 
-        
+                p.requires_grad = False
+
+        noise = torch.randn(real.size(0), config.nz).to(device)
+        fake = self.G(noise)
         output = self.D(fake)
         if opt.use_WGAN:
             err_G = output.mean()
@@ -171,26 +179,30 @@ class Runner(object):
             self.ms['dis'].add(wasserstein_dis.item())
 
     def prepare_all_gans_data(self):
-        global fake
-        fake = self.G(noise)
+        global noise, fake, real, label
+        sb = data_iter.next()
+        real, _ = sb
+        real = real.to(device)
+        batch_size = real.size(0)
+        with torch.no_grad():
+            noise = torch.randn(batch_size, config.nz).to(device)
+            fake = self.G(noise)
+        
+        label = torch.full((batch_size,), real_label, device=device)
 
     # one epoch train
     def train_one_epoch(self, cur_e = 0):
-        global device, gen_iterations
+        global device, data_iter
         device = self.device
-        
-        for i_b, sb in enumerate(self.train_dl):
+        data_iter = iter(self.train_dl)
+        i_b = 0
+        # exhausted_flag = False
+        while i_b < self.train_BNPE:
             # if i_b > 100:
             #     break
             # pdb.set_trace()
-            global real, noise
-            real, _ = sb
-            # real = real.view(-1, 28*28).to(device)
-            real = real.to(device)
-
-            noise = torch.randn(real.size(0), config.nz).to(device)
-
-            if gen_iterations < 25 or gen_iterations % 500 == 0:
+           
+            if self.gen_iterations < 25 or self.gen_iterations % 500 == 0:
                 Diters = 100
             else:
                 Diters = opt.Diters
@@ -198,26 +210,29 @@ class Runner(object):
             range_obj = range(Diters)
             if not opt.hpc_version:
                 range_obj = tqdm(range_obj)
-                pass
+            
             for iter_of_d in range_obj:
-            # for iter_of_d in tqdm(range(Diters)):
-            # for iter_of_d in range(Diters):
+                if i_b >= self.train_BNPE:
+                    # exhausted_flag = True
+                    break
                 self.prepare_all_gans_data()
-                self.train_Ds(end_flag = (iter_of_d == Diters - 1))
+                i_b += 1
+                self.i_batch_tot += 1
+                
+                self.train_Ds(end_flag = (iter_of_d == Diters - 1) or (i_b == self.train_BNPE))
 
-            # every update G one time, i_batch_tot inc 1
             self.train_G()
-            gen_iterations += 1
-            self.i_batch_tot += 1
+            self.gen_iterations += 1
+            debug_info ('gen_iter', self.gen_iterations)
 
-            if i_b % opt.print_freq == 0:
+            if self.gen_iterations % opt.print_freq == 0:
                 print ('[Train]: %s [%d/%d] (%d/%d) <%d>\tGAN Loss: [%.12f/%.12f]\tGP Loss: %.12f\tWasserstein Distance: %.12f' % (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
                     cur_e,
                     opt.max_epoch,
                     i_b,
                     self.train_BNPE,
-                    gen_iterations,
+                    self.gen_iterations,
                     self.ms['G'].mean,
                     self.ms['D'].mean,
                     self.ms['gp'].mean,
@@ -226,20 +241,20 @@ class Runner(object):
                 )
 
             # displaying
-            if self.i_batch_tot % opt.disp_freq == 0:
+            if self.gen_iterations % opt.disp_freq == 0:
                 # self.writer.add_image('train/real-fake', torch.cat([real.view(-1, 1, 28, 28)[:opt.disp_img_cnt], fake.view(-1, 1, 28, 28)[:opt.disp_img_cnt]], 2), self.i_batch_tot)
-                self.writer.add_image('train/real', make_grid(real, nrow = 10 if config.dataset == 'mnist' else 8, padding = 0, normalize = True), self.i_batch_tot)
-                self.writer.add_image('train/fake', make_grid(fake, nrow = 10 if config.dataset == 'mnist' else 8, padding = 0, normalize = True), self.i_batch_tot)
+                self.writer.add_image('train/real', make_grid(real[:config.max_imgs_to_show], nrow = 10 if config.dataset == 'mnist' else 8, padding = 0, normalize = True), self.gen_iterations)
+                self.writer.add_image('train/fake', make_grid(fake[:config.max_imgs_to_show], nrow = 10 if config.dataset == 'mnist' else 8, padding = 0, normalize = True), self.gen_iterations)
 
-                self.writer.add_scalar('train/G', self.ms['G'].mean, self.i_batch_tot)
-                self.writer.add_scalar('train/D', self.ms['D'].mean, self.i_batch_tot)
+                self.writer.add_scalar('train/G', self.ms['G'].mean, self.gen_iterations)
+                self.writer.add_scalar('train/D', self.ms['D'].mean, self.gen_iterations)
                 if opt.use_WGAN_GP:
-                    self.writer.add_scalar('train/gp', self.ms['gp'].mean, self.i_batch_tot)
-                    self.writer.add_scalar('train/wasserstein_dis', self.ms['dis'].mean, self.i_batch_tot)
+                    self.writer.add_scalar('train/gp', self.ms['gp'].mean, self.gen_iterations)
+                    self.writer.add_scalar('train/wasserstein_dis', self.ms['dis'].mean, self.gen_iterations)
 
 
         print ('*' * 30)
-        print ('[Train]: %s [%d/%d]\tGAN Loss: [%.12f/%.12f]\tGP Loss: %.12f\tWasserstein Distance: %.12f' % (
+        print ('[Train]: %s [%d/%d]\tGAN Loss: [%.12f/%.12f]\tGP Loss: %.12f\tWasserstein Distance: %.12f' %         (
                     time.strftime("%m-%d %H:%M:%S", time.localtime()),
                     cur_e,
                     opt.max_epoch,
@@ -247,8 +262,8 @@ class Runner(object):
                     self.ms['D'].mean,
                     self.ms['gp'].mean,
                     self.ms['dis'].mean,
-                    )
                 )
+        )
         print ('*' * 30)
 
 
@@ -284,6 +299,7 @@ class Runner(object):
 
             self.last_epoch = ckpt['epoch']
             self.i_batch_tot = ckpt['i_batch_tot']
+            self.gen_iterations = ckpt['gen_iterations']
             print ('Cont Train from Epoch %2d' % (self.last_epoch + 1))
 
     def save_checkpoint(self, cur_e = 0):
@@ -294,6 +310,7 @@ class Runner(object):
         ckpt_dict = {
             'epoch': cur_e,
             'i_batch_tot': self.i_batch_tot,
+            'gen_iterations': self.gen_iterations,
             'model': self.G.state_dict(),
             'model_D': self.D.state_dict(),
             'optim': self.optim.state_dict(),
@@ -326,6 +343,8 @@ class Runner(object):
             self.G = v_models.MNIST_Generator()
         elif config.dataset == 'cifar10':
             self.G = v_models.CIFAR10_Generator()
+        elif config.dataset == 'anime':
+            self.G = v_models.ANIME_Generator()
         self.G.to(device)
         self.G.apply(weight_init)
 
@@ -333,6 +352,8 @@ class Runner(object):
             self.D = v_models.MNIST_Discriminator()
         elif config.dataset == 'cifar10':
             self.D = v_models.CIFAR10_Discriminator()
+        elif config.dataset == 'anime':
+            self.D = v_models.ANIME_Discriminator()
         self.D.to(device)
         self.D.apply(weight_init)
 
@@ -345,6 +366,12 @@ class Runner(object):
             ]))
         elif config.dataset == 'cifar10':
             trainset = datasets.CIFAR10(root='./playground/validator_data/cifar10', train=True, download=False, transform=transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+            ]))
+        elif config.dataset == 'anime':
+            trainset = datasets.ImageFolder('./playground/validator_data/anime', transform=transforms.Compose([
+                # transforms.Resize((48, 48)),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
             ]))
@@ -378,6 +405,7 @@ class Runner(object):
         # aux vars
         self.last_epoch = -1
         self.i_batch_tot = 0
+        self.gen_iterations = 0
 
 runner = Runner()
 runner.run()
