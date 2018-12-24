@@ -150,6 +150,14 @@ def debug_info(*msg):
     if opt.debug:
         print (*msg)
 
+
+def dict2list(d):
+    s = ""
+    for item in d.items():
+        s += "* %s: %s\n\n" % item
+        # pdb.set_trace()
+    return s
+
 if __name__ == '__main__':
     m = Meter()
     pdb.set_trace()

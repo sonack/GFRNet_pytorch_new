@@ -26,6 +26,9 @@ import numpy as np
 import validator_models as v_models
 from torchvision.utils import make_grid
 
+from custom_utils import dict2list
+
+
 if opt.hpc_version:
     num = 4
     torch.set_num_threads(num)
@@ -410,11 +413,12 @@ class Runner(object):
             print("WARNING: You have a CUDA device, so you should probably run with --cuda")
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and opt.cuda else "cpu")
         print ('Use device: %s' % self.device)
-
         # save_configs
         configs = json.dumps(vars(opt), indent=2)
         print (colored(configs, 'green'))
-        self.writer.add_text('Configs', configs, 0)
+        # self.writer.add_text('Configs', configs, 0)
+        self.writer.add_text('Configs', dict2list(vars(opt)), 0)
+
         opts_json_path = path.join(opt.checkpoint_dir, 'opts.json')
         with open(opts_json_path, 'w') as f:
             print ('Save Opts to %s' % opts_json_path)
