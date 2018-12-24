@@ -233,7 +233,7 @@ class ANIME_Discriminator(nn.Module):
             # 输出 (ndf*8) x 4 x 4
 
             nn.Conv2d(ndf * 8, 1, 4, 1, 0, bias=False),
-            nn.Sigmoid()  # 输出一个数(概率)
+            # nn.Sigmoid()  # 输出一个数(概率)
         )
 
     def forward(self, input):
