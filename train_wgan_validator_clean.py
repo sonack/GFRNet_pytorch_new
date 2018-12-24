@@ -74,9 +74,10 @@ class Runner(object):
     
 
     def run(self):
+        self.reset_ms()
         for e in range(self.last_epoch + 1, opt.max_epoch):
             self.change_model_mode(True)
-            self.reset_ms()
+            # self.reset_ms()
             self.train_one_epoch(e)
 
             if (e + 1) % opt.save_epoch_freq == 0:
@@ -104,6 +105,7 @@ class Runner(object):
 
         noise = torch.randn(real.size(0), config.nz).to(device)
         fake = self.G(noise)
+
         output = self.D(fake)
         if opt.use_WGAN:
             err_G = output.mean()
@@ -155,7 +157,8 @@ class Runner(object):
             gp = calc_gradient_penalty(self.D, real.data, fake.data)
             # gp = calc_gradient_penalty_mnist(self.D, real.data, fake.data)
             gp_l = opt.gp_lambda * gp
-            self.ms['gp'].add(gp_l.item())
+            # if end_flag:
+            #     self.ms['gp'].add(gp_l.item())
             gp_l.backward()
 
         if opt.use_WGAN:
@@ -177,7 +180,11 @@ class Runner(object):
         # logging
         if end_flag:
             self.ms['D'].add(err_D.item())
-            self.ms['dis'].add(wasserstein_dis.item())
+            if opt.use_WGAN:
+                self.ms['dis'].add(wasserstein_dis.item())
+                if opt.use_WGAN_GP:
+                    self.ms['gp'].add(gp_l.item())
+
 
     def prepare_all_gans_data(self):
         global noise, fake, real, label
@@ -212,19 +219,27 @@ class Runner(object):
             if not opt.hpc_version:
                 range_obj = tqdm(range_obj)
             
+            remain_data = self.train_BNPE - i_b
+            if remain_data < Diters:
+                # debug_info = print
+                print ("Exhausted data, early finish one epoch! (not update G)")
+                break
+
             for iter_of_d in range_obj:
-                if i_b >= self.train_BNPE:
-                    # exhausted_flag = True
-                    break
+                # if i_b >= self.train_BNPE:
+                #     exhausted_flag = True
+                #     break
                 self.prepare_all_gans_data()
                 i_b += 1
-                self.i_batch_tot += 1
                 
-                self.train_Ds(end_flag = (iter_of_d == Diters - 1) or (i_b == self.train_BNPE))
+                self.train_Ds(end_flag = (iter_of_d == Diters - 1))
 
+            # if exhausted_flag:
+            #     break
             self.train_G()
             self.gen_iterations += 1
-            debug_info ('gen_iter', self.gen_iterations)
+
+            print ('gen_iter', self.gen_iterations)
 
             if self.gen_iterations % opt.print_freq == 0:
                 print ('[Train]: %s [%d/%d] (%d/%d) <%d>\tGAN Loss: [%.12f/%.12f]\tGP Loss: %.12f\tWasserstein Distance: %.12f' % (
@@ -255,24 +270,25 @@ class Runner(object):
 
 
         print ('*' * 30)
-        print ('[Train]: %s [%d/%d]\tGAN Loss: [%.12f/%.12f]\tGP Loss: %.12f\tWasserstein Distance: %.12f' %         (
-                    time.strftime("%m-%d %H:%M:%S", time.localtime()),
-                    cur_e,
-                    opt.max_epoch,
-                    self.ms['G'].mean,
-                    self.ms['D'].mean,
-                    self.ms['gp'].mean,
-                    self.ms['dis'].mean,
-                )
-        )
-        print ('*' * 30)
+        print ('The Data of Epoch %d is Exhausted!' % cur_e)
+        # print ('[Train]: %s [%d/%d]\tGAN Loss: [%.12f/%.12f]\tGP Loss: %.12f\tWasserstein Distance: %.12f' %         (
+        #             time.strftime("%m-%d %H:%M:%S", time.localtime()),
+        #             cur_e,
+        #             opt.max_epoch,
+        #             self.ms['G'].mean,
+        #             self.ms['D'].mean,
+        #             self.ms['gp'].mean,
+        #             self.ms['dis'].mean,
+        #         )
+        # )
+        # print ('*' * 30)
 
 
-        self.writer.add_scalar('train/epoch/G', self.ms['G'].mean, cur_e)
-        self.writer.add_scalar('train/epoch/D', self.ms['D'].mean, cur_e)
-        if opt.use_WGAN_GP:
-            self.writer.add_scalar('train/epoch/gp', self.ms['gp'].mean, cur_e)
-            self.writer.add_scalar('train/epoch/wasserstein_dis', self.ms['dis'].mean, cur_e)
+        # self.writer.add_scalar('train/epoch/G', self.ms['G'].mean, cur_e)
+        # self.writer.add_scalar('train/epoch/D', self.ms['D'].mean, cur_e)
+        # if opt.use_WGAN_GP:
+        #     self.writer.add_scalar('train/epoch/gp', self.ms['gp'].mean, cur_e)
+        #     self.writer.add_scalar('train/epoch/wasserstein_dis', self.ms['dis'].mean, cur_e)
 
         
     def prepare_losses(self):
@@ -299,7 +315,7 @@ class Runner(object):
             self.optimD.load_state_dict(ckpt['optim_D'])
 
             self.last_epoch = ckpt['epoch']
-            self.i_batch_tot = ckpt['i_batch_tot']
+            # self.i_batch_tot = ckpt['i_batch_tot']
             self.gen_iterations = ckpt['gen_iterations']
             print ('Cont Train from Epoch %2d' % (self.last_epoch + 1))
 
@@ -310,7 +326,7 @@ class Runner(object):
 
         ckpt_dict = {
             'epoch': cur_e,
-            'i_batch_tot': self.i_batch_tot,
+            # 'i_batch_tot': self.i_batch_tot,
             'gen_iterations': self.gen_iterations,
             'model': self.G.state_dict(),
             'model_D': self.D.state_dict(),
@@ -405,7 +421,7 @@ class Runner(object):
             f.write(configs)
         # aux vars
         self.last_epoch = -1
-        self.i_batch_tot = 0
+        # self.i_batch_tot = 0
         self.gen_iterations = 0
 
 runner = Runner()

@@ -470,19 +470,27 @@ class Runner(object):
                 Diters = opt.Diters
 
             if opt.skip_train_D:
-                Diters = 0
-            else:
-                range_obj = range(Diters)
-                if not opt.hpc_version:
-                    range_obj = tqdm(range_obj)
+                Diters = 1
+            
+            range_obj = range(Diters)
+            if not (opt.hpc_version or opt.skip_train_D):
+                range_obj = tqdm(range_obj)
+            remain_data = self.train_BNPE - i_b
+            if remain_data < Diters:
+                debug_info ("Exhausted data, early finish one epoch! (not update G)")
+                break
 
-                for iter_of_d in range_obj:
-                    if i_b >= self.train_BNPE:
-                        break
-                    self.prepare_all_gans_data()
-                    i_b += 1
-                    self.i_batch_tot += 1
-                    self.train_Ds(end_flag = (iter_of_d == Diters - 1) or (i_b == self.train_BNPE))
+            for iter_of_d in range_obj:
+                # if i_b >= self.train_BNPE:
+                #     break
+                self.prepare_all_gans_data()
+                i_b += 1
+                # self.i_batch_tot += 1
+                if opt.skip_train_D:
+                #     # debug_info ('skip train D!')
+                    debug_info ('skip train D!')
+                    break
+                self.train_Ds(end_flag = (iter_of_d == Diters - 1))
 
 
 
@@ -635,7 +643,7 @@ class Runner(object):
                     )
                 )
 
-                self.writer.add_image('test/guide-gt-blur-warp-res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt]], 2), self.i_batch_tot)
+                self.writer.add_image('test/guide-gt-blur-warp-res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt]], 2), self.gen_iterations)
         
         print ('=' * 30)
         print ('[Test]: %s [%d/%d]\tPt Loss=%.12f\tTV Loss=%.12f\tSym Loss=%.12f\tMse Loss=%.12f\tPerp Loss=%.12f\tTot Loss=%.12f' % (
@@ -718,7 +726,7 @@ class Runner(object):
                     pass
             
             self.last_epoch = ckpt['epoch']
-            self.i_batch_tot = ckpt['i_batch_tot']
+            # self.i_batch_tot = ckpt['i_batch_tot']
             self.gen_iterations = ckpt['gen_iterations']
             print ('Cont Train from Epoch %2d' % (self.last_epoch + 1))
         if opt.load_warpnet:
@@ -733,7 +741,7 @@ class Runner(object):
         print ('Save Model to %s ... ' % ckpt_file)
         ckpt_dict = {
             'epoch': cur_e,
-            'i_batch_tot': self.i_batch_tot,
+            # 'i_batch_tot': self.i_batch_tot,
             'gen_iterations': self.gen_iterations,
             'model': self.G.state_dict(),
             'model_GD': self.GD.state_dict(),
@@ -881,7 +889,7 @@ class Runner(object):
             f.write(configs)
         # aux vars
         self.last_epoch = -1
-        self.i_batch_tot = 0
+        # self.i_batch_tot = 0
         self.orig_xy_map = create_orig_xy_map().to(self.device)
         self.parts_l_w = [opt.pd_L_l_w, opt.pd_R_l_w, opt.pd_N_l_w, opt.pd_M_l_w]
         self.gen_iterations = 0
