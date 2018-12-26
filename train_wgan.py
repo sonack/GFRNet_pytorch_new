@@ -23,6 +23,7 @@ import time
 from tqdm import tqdm
 
 from custom_utils import dict2list
+from collections import OrderedDict
 
 real_label = 1
 fake_label = 0
@@ -893,12 +894,13 @@ class Runner(object):
             print("WARNING: You have a CUDA device, so you should probably run with --cuda")
         self.device = torch.device("cuda:0" if torch.cuda.is_available() and opt.cuda else "cpu")
         print ('Use device: %s' % self.device)
-
+        opt_dict = OrderedDict(sorted(vars(opt).items()))
         # save_configs
-        configs = json.dumps(vars(opt), indent=2)
+        configs = json.dumps(opt_dict, indent=2)
         print (colored(configs, 'green'))
+        # pdb.set_trace()
         # self.writer.add_text('Configs', configs, 0)
-        self.writer.add_text('Configs', dict2list(vars(opt)), 0)
+        self.writer.add_text('Configs', dict2list(opt_dict), 0)
         opts_json_path = path.join(opt.checkpoint_dir, 'opts.json')
         with open(opts_json_path, 'w') as f:
             print ('Save Opts to %s' % opts_json_path)
