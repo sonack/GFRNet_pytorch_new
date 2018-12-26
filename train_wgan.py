@@ -693,7 +693,7 @@ class Runner(object):
         self.point_crit = MaskedMSELoss()
         self.tv_crit = TVLoss()
         self.mse_crit = nn.MSELoss(reduction='sum')
-        self.perp_crit = VggFaceLoss(3)
+        self.perp_crit = VggFaceLoss(opt.vgg_conv_X)
         self.perp_crit.to(self.device)
 
 

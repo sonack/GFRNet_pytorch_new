@@ -140,6 +140,9 @@ parser.add_argument('--deconv_kind', type=str, default='deconv', help='the vanil
 
 parser.add_argument('--skip_train_D', action='store_true', help='enable this when you just wanna only train G, i.e. no GAN loss is applied')
 
+parser.add_argument('--vgg_conv_X', type=int, default=3, help='to use conv3 or conv4 vgg perp loss')
+
+
 
 opt = parser.parse_args()
 
