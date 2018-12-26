@@ -27,8 +27,11 @@ from custom_utils import dict2list
 real_label = 1
 fake_label = 0
 
+
+debug_info ("is_hpc_version", opt.hpc_version)
 if opt.hpc_version:
-    num = 4
+    num = opt.num_workers
+    debug_info("set num of threads to %d" % num)
     torch.set_num_threads(num)
 
 def noisy_real_label():
@@ -51,6 +54,7 @@ class Runner(object):
         self.load_checkpoint()
 
         if opt.debug:
+            debug_info ('register grad func to inter tensor')
             self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
 
     def __del__(self):
@@ -93,6 +97,7 @@ class Runner(object):
         return real, fake
 
     def run(self):
+        debug_info ("run!")
         # global gen_iterations
         # gen_iterations = 0
         for e in range(self.last_epoch + 1, opt.max_epoch):
@@ -116,6 +121,7 @@ class Runner(object):
 
 
     def train_G(self):
+        debug_info ("train G")
         global w_gd, grid, res, label
         label = torch.full_like(label, real_label)
         ############################
@@ -228,6 +234,7 @@ class Runner(object):
         self.ms['LR_G'].add(LR_G_l.item())
 
     def train_Ds(self, end_flag): 
+        debug_info ("train D")
         ############################
         # (1) Update D network
         ###########################
@@ -440,6 +447,7 @@ class Runner(object):
 
     # one epoch train
     def train_one_epoch(self, cur_e = 0):
+        debug_info ("train one epoch")
         global device, data_iter
         device = self.device
         # grid_grad_meter = Meter()
@@ -447,9 +455,13 @@ class Runner(object):
 
         # inter_grad_meter = Meter()
         # inter_grad_func = print_inter_grad("recNet encoder[0].weight grad", inter_grad_meter)
+
+        debug_info ("before data_iter")
         data_iter = iter(self.train_dl)
+        debug_info ("after data_iter")
         i_b = 0
         while i_b < self.train_BNPE:
+            debug_info ("enter while")
         # for i_b, sb in enumerate(self.train_dl):
             # if i_b > 100:
             #     break
@@ -473,6 +485,7 @@ class Runner(object):
             if opt.skip_train_D:
                 Diters = 1
             
+            debug_info ("Diters is", Diters)
             range_obj = range(Diters)
             if not (opt.hpc_version or opt.skip_train_D):
                 range_obj = tqdm(range_obj)
@@ -484,6 +497,7 @@ class Runner(object):
             for iter_of_d in range_obj:
                 # if i_b >= self.train_BNPE:
                 #     break
+                debug_info("prepare_all_gans_data()")
                 self.prepare_all_gans_data()
                 i_b += 1
                 # self.i_batch_tot += 1
