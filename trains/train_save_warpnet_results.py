@@ -1,4 +1,6 @@
 from __future__ import division, print_function
+import os, sys
+sys.path.append(os.getcwd())
 
 import json
 import pdb
@@ -26,8 +28,7 @@ class Runner(object):
     def __init__(self):
 
         # self.writer = SummaryWriter(path.join("tb_logs", opt.exp_name))
-    
-
+        
         self.startup()
         self.prepare_data()
         self.prepare_model()
@@ -235,7 +236,17 @@ class Runner(object):
         self.warpnet_C.load_state_dict(ckpt_C['model'])
         print ('Load ckpt C from %s' % opt.load_checkpoint_C)
         
+        if not opt.load_checkpoint_D:
+            return
+        ckpt_D = torch.load(opt.load_checkpoint_D)
+        self.warpnet_D.load_state_dict(ckpt_D['model'])
+        print ('Load ckpt D from %s' % opt.load_checkpoint_D)
 
+        if not opt.load_checkpoint_E:
+            return
+        ckpt_E = torch.load(opt.load_checkpoint_E)
+        self.warpnet_E.load_state_dict(ckpt_E['model'])
+        print ('Load ckpt E from %s' % opt.load_checkpoint_E)
 
 
     def save_checkpoint(self, cur_e = 0):
@@ -271,6 +282,14 @@ class Runner(object):
         self.warpnet_C = models.GFRNet_warpnet()
         self.warpnet_C.to(self.device)
         self.warpnet_C.apply(weight_init)
+
+        self.warpnet_D = models.GFRNet_warpnet()
+        self.warpnet_D.to(self.device)
+        self.warpnet_D.apply(weight_init)
+
+        self.warpnet_E = models.GFRNet_warpnet()
+        self.warpnet_E.to(self.device)
+        self.warpnet_E.apply(weight_init)
 
 
     def prepare_data(self):
@@ -349,9 +368,12 @@ class Runner(object):
                 w_gd, grid = self.warpnet(bl, gd)
                 w_gd_B, grid_B = self.warpnet_B(bl, gd)
                 w_gd_C, grid_C = self.warpnet_C(bl, gd)
+                w_gd_D, grid_D = self.warpnet_D(bl, gd)
+                w_gd_E, grid_E = self.warpnet_E(bl, gd)
+
                 bs = gd.size(0)
                 for b_id in tqdm(range(bs)):
-                    save_image(torch.cat([gd[b_id], gt[b_id], w_gd[b_id], w_gd_B[b_id], w_gd_C[b_id]], 0).view(5, 3, opt.img_size, opt.img_size), n_fn[b_id], padding = 0)
+                    save_image(torch.cat([gd[b_id], gt[b_id], w_gd[b_id], w_gd_B[b_id], w_gd_C[b_id], w_gd_D[b_id], w_gd_E[b_id]], 0).view(7, 3, opt.img_size, opt.img_size), n_fn[b_id], padding = 0)
 
 runner = Runner()
 # runner.run()

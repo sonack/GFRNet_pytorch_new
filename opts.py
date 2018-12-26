@@ -94,6 +94,9 @@ parser.add_argument('--use_LSGAN', action='store_true', help='whether to use lsg
 
 parser.add_argument('--load_checkpoint_B', type=str, default=None, help='the dir to another to load warpnet model checkpoint')
 parser.add_argument('--load_checkpoint_C', type=str, default=None, help='the dir to another another to load warpnet model checkpoint')
+parser.add_argument('--load_checkpoint_D', type=str, default=None, help='the dir to another another another to load warpnet model checkpoint')
+parser.add_argument('--load_checkpoint_E', type=str, default=None, help='the dir to another^4 to load warpnet model checkpoint')
+
 
 
 # cond GD
