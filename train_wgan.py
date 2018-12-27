@@ -631,9 +631,11 @@ class Runner(object):
                 perp_l = opt.perp_l_w * self.perp_crit(res, gt)
 
                 # rec_l = mse_l
-                rec_l = perp_l
+                # rec_l = perp_l
+                rec_l = mse_l + perp_l
 
-                tot_l = flow_l + rec_l
+                # tot_l = flow_l + rec_l
+                tot_l = rec_l
 
 
             self.ms['pt'].add(pt_l.item())

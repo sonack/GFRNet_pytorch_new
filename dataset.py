@@ -363,6 +363,8 @@ class FaceDataset(Dataset):
         return sample
 
 def test():
+    import ipdb
+    ipdb.set_trace()
     img_dir = './DataSets/Original/Train'
     landmark_dir = 'DataSets/Original/Landmark'
     sym_dir = None

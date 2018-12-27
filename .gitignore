@@ -2,6 +2,7 @@ checkpoints/*
 DataSets/*
 netVggs/*
 tb_logs/*
+tb_logs
 pbs_logs/*
 __pycache__
 
