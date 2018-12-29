@@ -18,7 +18,7 @@ from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
 from os import path
 from torchvision import transforms
-import pdb
+import ipdb
 import time
 from tqdm import tqdm
 
@@ -631,9 +631,11 @@ class Runner(object):
                 perp_l = opt.perp_l_w * self.perp_crit(res, gt)
 
                 # rec_l = mse_l
-                rec_l = perp_l
+                # rec_l = perp_l
+                rec_l = mse_l + perp_l
 
-                tot_l = flow_l + rec_l
+                # tot_l = flow_l + rec_l
+                tot_l = rec_l
 
 
             self.ms['pt'].add(pt_l.item())
@@ -693,9 +695,9 @@ class Runner(object):
         self.point_crit = MaskedMSELoss()
         self.tv_crit = TVLoss()
         self.mse_crit = nn.MSELoss(reduction='sum')
-        self.perp_crit = VggFaceLoss(3)
+        self.perp_crit = VggFaceLoss(opt.vgg_conv_X)
         self.perp_crit.to(self.device)
-
+        # ipdb.set_trace()
 
         if not opt.use_WGAN:
             self.GD_crit = nn.BCELoss()

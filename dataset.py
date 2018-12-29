@@ -1,7 +1,7 @@
 from __future__ import division, print_function
 
 import os
-import pdb
+import ipdb
 import random
 from collections import namedtuple
 from math import ceil, floor
@@ -41,7 +41,7 @@ Point = namedtuple('Point', ['x', 'y'])
 
 # br, gd, img_path
 class LoadFaceDataset(Dataset):
-    def __init__(self, img_dir = None, transform = None):
+    def __init__(self, img_dir = None, transform = None, mask_dir = None):
         self.img_dir = img_dir
         self.transform = transform
         self._img_list = []
@@ -50,6 +50,8 @@ class LoadFaceDataset(Dataset):
             full_filename = path.join(self.img_dir, filename)
             if path.isfile(full_filename) and (file_suffix(filename) in img_suffixes):
                 self._img_list.append(filename)
+        self.mask_dir = mask_dir
+        
     
     def __len__(self):
         return len(self._img_list)
@@ -61,14 +63,28 @@ class LoadFaceDataset(Dataset):
         wd = int(image.shape[1] // 2)
         left = image[:,:wd,:]
         right = image[:,wd:,:]
+        
         sample = {
             'blur': left,
             'guide': right,
             'img_path': img_filename,
         }
+
+        if self.mask_dir:
+            file_id_name = self._img_list[idx].split('_')[0] + '.png'
+            mask_file = path.join(self.mask_dir, file_id_name)
+            # print (mask_file)
+            # ipdb.set_trace()
+            mask = cv2.imread(mask_file, cv2.IMREAD_GRAYSCALE).astype(np.bool).astype(np.float32)
+            sample['mask'] = mask
+        
         if self.transform:
             sample = self.transform(sample)
         return sample
+
+
+
+# ------------------------------------------------
 
 class FaceDataset(Dataset):
     def __init__(self, img_dir = None, landmark_dir = None, sym_dir = None, mask_dir = None, face_masks_dir = None, flip_prob = 0.5, transform = None, test_mode = False):
@@ -363,6 +379,8 @@ class FaceDataset(Dataset):
         return sample
 
 def test():
+    import ipdb
+    ipdb.set_trace()
     img_dir = './DataSets/Original/Train'
     landmark_dir = 'DataSets/Original/Landmark'
     sym_dir = None
