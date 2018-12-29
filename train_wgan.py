@@ -212,10 +212,10 @@ class Runner(object):
 
 
         # tot_l = flow_l + rec_l + adv_l
-        # tot_l = rec_l + adv_l
+        tot_l = rec_l + adv_l
         # tot_l = rec_l
         # tot_l = adv_l
-        tot_l = rec_l
+        # tot_l = rec_l
 
         self.G.zero_grad()
         tot_l.backward()
@@ -478,7 +478,7 @@ class Runner(object):
             #     'f_r': f_r,
             #     'p_p': p_p
             # }
-            if self.gen_iterations < 25 or self.gen_iterations % 500 == 0:
+            if (self.gen_iterations < (25 + self.start_gen_iters)) or (self.gen_iterations % 500 == 0):
                 Diters = 100
             else:
                 Diters = opt.Diters
@@ -746,6 +746,7 @@ class Runner(object):
             self.last_epoch = ckpt['epoch']
             # self.i_batch_tot = ckpt['i_batch_tot']
             self.gen_iterations = ckpt['gen_iterations']
+            self.start_gen_iters = self.gen_iterations
             print ('Cont Train from Epoch %2d' % (self.last_epoch + 1))
         if opt.load_warpnet:
             ckpt = torch.load(opt.load_warpnet)
