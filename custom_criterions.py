@@ -335,7 +335,7 @@ class VggFaceLoss(nn.Module):
         super(VggFaceLoss, self).__init__()
         self.netVgg = netVgg_conv3 if ver == 3 else netVgg_conv4
         self.netVgg.load_state_dict(torch.load('./netVggs/netVgg_conv%d.pth' % ver))
-        # self.netVgg.eval()
+        self.netVgg.eval()
         self.criterion = nn.MSELoss()
 
         self.register_parameter("RGB_mean", nn.Parameter(torch.tensor([129.1863,104.7624,93.5940]).view(1, 3, 1, 1)))
