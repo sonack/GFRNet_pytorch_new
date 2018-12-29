@@ -18,7 +18,7 @@ from custom_criterions import MaskedMSELoss, TVLoss, SymLoss, VggFaceLoss
 import random
 from os import path
 from torchvision import transforms
-import pdb
+import ipdb
 import time
 from tqdm import tqdm
 
@@ -697,7 +697,7 @@ class Runner(object):
         self.mse_crit = nn.MSELoss(reduction='sum')
         self.perp_crit = VggFaceLoss(opt.vgg_conv_X)
         self.perp_crit.to(self.device)
-
+        # ipdb.set_trace()
 
         if not opt.use_WGAN:
             self.GD_crit = nn.BCELoss()
