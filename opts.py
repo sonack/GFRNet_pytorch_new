@@ -142,6 +142,14 @@ parser.add_argument('--skip_train_D', action='store_true', help='enable this whe
 
 parser.add_argument('--vgg_conv_X', type=int, default=3, help='to use conv3 or conv4 vgg perp loss')
 
+parser.add_argument('--no_prewarm_D', action='store_true', help='disable train more(100) D at start')
+parser.add_argument('--prewarm_len', type=int, default=25, help='prewarm iterations')
+
+parser.add_argument('--warm_interval', type=int, default=500, help='the iters interval to warm up D(100)')
+
+
+parser.add_argument('--no_rec_loss', action='store_true', help='disable rec(mse+perp) loss backward')
+
 
 
 opt = parser.parse_args()

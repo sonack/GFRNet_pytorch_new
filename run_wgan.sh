@@ -71,7 +71,36 @@
 # python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_45_test_vgg_[conv4]_5" --print_freq 100 --disp_freq 100 --save_epoch_freq 2 --pd_L_l_w 2 --pd_R_l_w 2 --pd_N_l_w 2 --pd_M_l_w 2 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --skip_train_D --lr 2e-4 --load_checkpoint "./checkpoints/exp_45_test_vgg_[conv4]_4/ckpt_082.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4
 
 
-python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_46_add_part" --print_freq 100 --disp_freq 100 --save_epoch_freq 2 --pd_L_l_w 2 --pd_R_l_w 2 --pd_N_l_w 2 --pd_M_l_w 2 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_45_test_vgg_[conv4]_5/ckpt_084.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4
+# python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_46_add_part" --print_freq 100 --disp_freq 100 --save_epoch_freq 2 --pd_L_l_w 2 --pd_R_l_w 2 --pd_N_l_w 2 --pd_M_l_w 2 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_45_test_vgg_[conv4]_5/ckpt_084.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4
+
+
+
+# python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_46_add_part_w=10" --print_freq 100 --disp_freq 100 --save_epoch_freq 2 --pd_L_l_w 10 --pd_R_l_w 10 --pd_N_l_w 10 --pd_M_l_w 10 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_46_add_part/ckpt_116.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4
+
+# python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_46_add_part_w=10_grad" --print_freq 100 --disp_freq 100 --save_epoch_freq 2 --pd_L_l_w 10 --pd_R_l_w 10 --pd_N_l_w 10 --pd_M_l_w 10 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_46_add_part_w=10/ckpt_132.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4 --debug --no_prewarm_D --manual_seed 1996 --pd_L_l_w 0 --pd_R_l_w 0 --pd_N_l_w 0 --pd_M_l_w 0
+
+# python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_46_add_part_w=2000" --print_freq 100 --disp_freq 100 --save_epoch_freq 5 --pd_L_l_w 2000 --pd_R_l_w 2000 --pd_N_l_w 2000 --pd_M_l_w 2000 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_46_add_part_w=10/ckpt_132.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4 --no_prewarm_D
+
+
+# remove no_prewarm_D 
+# more warm(warm_interval:100)
+# python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_46_add_part_w=1_noRecLoss_morewarm" --print_freq 100 --disp_freq 100 --save_epoch_freq 5 --pd_L_l_w 1 --pd_R_l_w 1 --pd_N_l_w 1 --pd_M_l_w 1 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_46_add_part_w=10/ckpt_132.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4 --mse_l_w 0 --perp_l_w 0 --warm_interval 100
+
+
+
+# python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_46_add_part_w=1_RecLoss_morewarm" --print_freq 100 --disp_freq 100 --save_epoch_freq 5 --pd_L_l_w 1 --pd_R_l_w 1 --pd_N_l_w 1 --pd_M_l_w 1 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_46_add_part_w=1_noRecLoss_morewarm/ckpt_220.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4 --warm_interval 100
+
+
+
+
+python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_47_1" --print_freq 100 --disp_freq 100 --save_epoch_freq 5 --pd_L_l_w 1 --pd_R_l_w 0 --pd_N_l_w 0 --pd_M_l_w 0 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_46_add_part_w=1_RecLoss_morewarm/ckpt_885.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4 --warm_interval 100 --no_rec_loss --prewarm_len 10
+
+
+
+
+
+
+
 
 
 

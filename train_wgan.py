@@ -212,7 +212,11 @@ class Runner(object):
 
 
         # tot_l = flow_l + rec_l + adv_l
-        tot_l = rec_l + adv_l
+        # flow loss disabled by default
+        if opt.no_rec_loss:
+            tot_l = adv_l
+        else:
+            tot_l = rec_l + adv_l
         # tot_l = rec_l
         # tot_l = adv_l
         # tot_l = rec_l
@@ -478,7 +482,7 @@ class Runner(object):
             #     'f_r': f_r,
             #     'p_p': p_p
             # }
-            if (self.gen_iterations < (25 + self.start_gen_iters)) or (self.gen_iterations % 500 == 0):
+            if ((not opt.no_prewarm_D) and (self.gen_iterations < (opt.prewarm_len + self.start_gen_iters))) or (self.gen_iterations % opt.warm_interval == 0):
                 Diters = 100
             else:
                 Diters = opt.Diters
