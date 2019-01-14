@@ -159,7 +159,8 @@ class Runner(object):
         mse_l = opt.mse_l_w * self.mse_crit(res, gt)
         perp_l = opt.perp_l_w * self.perp_crit(res, gt)
 
-        rec_l = perp_l + mse_l
+        # rec_l = perp_l + mse_l
+        rec_l = mse_l
 
 
         # grid.register_hook(grid_grad_func)
@@ -217,6 +218,9 @@ class Runner(object):
             tot_l = adv_l
         else:
             tot_l = rec_l + adv_l
+            # tot_l = rec_l
+            # tot_l = mse_l
+            # tot_l = perp_l
         # tot_l = rec_l
         # tot_l = adv_l
         # tot_l = rec_l
@@ -551,7 +555,7 @@ class Runner(object):
             # if self.i_batch_tot % opt.disp_freq == 0:
             if self.gen_iterations % opt.disp_freq == 0:
                 self.writer.add_image('train/guide-gt-blur-warp-res-local_gt-local_res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_real[:opt.disp_img_cnt], local_fake[:opt.disp_img_cnt]], 2), self.gen_iterations)
-                # self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt], parts_real[1][:opt.disp_img_cnt], parts_real[2][:opt.disp_img_cnt], parts_real[3][:opt.disp_img_cnt]], 2), self.gen_iterations)
+                self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt], parts_real[1][:opt.disp_img_cnt], parts_real[2][:opt.disp_img_cnt], parts_real[3][:opt.disp_img_cnt]], 2), self.gen_iterations)
                 
                 self.writer.add_scalar('train/mse_loss', self.ms['mse'].mean, self.gen_iterations)
                 self.writer.add_scalar('train/perp_loss', self.ms['perp'].mean, self.gen_iterations)

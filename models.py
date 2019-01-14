@@ -354,6 +354,7 @@ class GFRNet_partDiscriminator(nn.Module):
             modules.append(nn.Sigmoid())
 
         self.D = nn.Sequential(*modules)
+        # print (self.D)
     
     def forward(self, x):
         output = self.D(x)
