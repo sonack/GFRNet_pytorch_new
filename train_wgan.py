@@ -55,6 +55,8 @@ class Runner(object):
         self.prepare_losses()
         self.load_checkpoint()
 
+        self.put_to_multiple_gpus()
+
         if opt.debug:
             debug_info ('register grad func to inter tensor')
             self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
@@ -62,6 +64,14 @@ class Runner(object):
     def __del__(self):
         self.writer.close()
     
+    def put_to_multiple_gpus(self):
+        # data parallel
+        if opt.use_mult_gpus:
+            print ('Put models to multiple[%d] gpus ...' % torch.cuda.device_count())
+            for m_id in range(len(self.models)):
+                self.models[m_id] = nn.DataParallel(self.models[m_id])
+                self.G, self.GD, self.LD, *self.PD, self.LR = self.models
+        # ipdb.set_trace()
 
     def prepare_gan_pair_data(self, d, kind = 'global3'):
         if kind == 'global3':
@@ -724,13 +734,31 @@ class Runner(object):
                 self.PD_crit.append(nn.BCELoss())
 
             self.LR_crit = nn.BCELoss()
-        
+      
+
+
+
     def load_checkpoint(self):
+        # multi-gpu load [remove module. prefix]
+        # ref: [https://github.com/qiaoguan/Person-reid-GAN-pytorch/blob/master/test.py]
+        def load_network(state_dict):
+            if not list(state_dict.keys())[0].startswith('module.'):
+                return state_dict
+
+            new_state_dict = OrderedDict()
+            for k, v in state_dict.items():
+                nk = k[7:] # remove `module.`
+                new_state_dict[nk] = v
+            return new_state_dict
+        
         if not (opt.load_checkpoint or opt.load_warpnet):
             return
+
+
+        
         if opt.load_checkpoint:
             ckpt = torch.load(opt.load_checkpoint)
-            self.G.load_state_dict(ckpt['model'])
+            self.G.load_state_dict(load_network(ckpt['model']))
             if 'model_GD' in ckpt:
                 # self.GD.load_state_dict(ckpt['model_GD'])
                 pass
@@ -743,10 +771,10 @@ class Runner(object):
             
             if 'model_PD_L' in ckpt:
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
-                    # self.PD[i].load_state_dict(ckpt['model_PD_%c' % p])
-                    pass
+                    self.PD[i].load_state_dict(load_network(ckpt['model_PD_%c' % p]))
+                    # pass
             
-            # self.optim.load_state_dict(ckpt['optim'])
+            self.optim.load_state_dict(ckpt['optim'])
             if 'optim_GD' in ckpt:
                 # self.optimGD.load_state_dict(ckpt['optim_GD'])
                 pass
@@ -756,8 +784,8 @@ class Runner(object):
                 pass
             if 'optim_PD_L' in ckpt:
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
-                    # self.optimPD[i].load_state_dict(ckpt['optim_PD_%c' % p])
-                    pass
+                    self.optimPD[i].load_state_dict(ckpt['optim_PD_%c' % p])
+                    # pass
             
             self.last_epoch = ckpt['epoch']
             # self.i_batch_tot = ckpt['i_batch_tot']
@@ -874,6 +902,8 @@ class Runner(object):
         self.LR.apply(weight_init)
 
         self.models = [self.G, self.GD, self.LD, *self.PD, self.LR]
+
+        
 
     def prepare_data(self):
         train_degradation_tsfm = custom_transforms.DegradationModel(opt.kind, opt.jpeg_last)

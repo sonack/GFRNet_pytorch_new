@@ -152,6 +152,9 @@ parser.add_argument('--no_rec_loss', action='store_true', help='disable rec(mse+
 
 parser.add_argument('--warm_Diters', type=int, default=100)
 
+parser.add_argument('--use_mult_gpus', action='store_true', help='whether to use DataParallel wrapper, i.e affect model loading or saving')
+
+
 
 opt = parser.parse_args()
 
