@@ -24,6 +24,7 @@ from tqdm import tqdm
 
 from custom_utils import dict2list
 from collections import OrderedDict
+import ipdb
 
 real_label = 1
 fake_label = 0
@@ -487,7 +488,7 @@ class Runner(object):
             #     'p_p': p_p
             # }
             if ((not opt.no_prewarm_D) and (self.gen_iterations < (opt.prewarm_len + self.start_gen_iters))) or (self.gen_iterations % opt.warm_interval == 0):
-                Diters = 100
+                Diters = opt.warm_Diters
             else:
                 Diters = opt.Diters
 
@@ -554,9 +555,16 @@ class Runner(object):
             # displaying
             # if self.i_batch_tot % opt.disp_freq == 0:
             if self.gen_iterations % opt.disp_freq == 0:
+                # ------- image disp -------
                 self.writer.add_image('train/guide-gt-blur-warp-res-local_gt-local_res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_real[:opt.disp_img_cnt], local_fake[:opt.disp_img_cnt]], 2), self.gen_iterations)
-                self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt], parts_real[1][:opt.disp_img_cnt], parts_real[2][:opt.disp_img_cnt], parts_real[3][:opt.disp_img_cnt]], 2), self.gen_iterations)
+                # ipdb.set_trace()
+                self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt, 3:], parts_real[1][:opt.disp_img_cnt, 3:], parts_real[2][:opt.disp_img_cnt, 3:], parts_real[3][:opt.disp_img_cnt, 3:]], 2), self.gen_iterations)
+
+                self.writer.add_image('train/rec/parts/L-R-N-M', torch.cat([parts_fake[0][:opt.disp_img_cnt, 3:], parts_fake[1][:opt.disp_img_cnt, 3:], parts_fake[2][:opt.disp_img_cnt, 3:], parts_fake[3][:opt.disp_img_cnt, 3:]], 2), self.gen_iterations)
                 
+                # ------- loss scalars -------
+
+
                 self.writer.add_scalar('train/mse_loss', self.ms['mse'].mean, self.gen_iterations)
                 self.writer.add_scalar('train/perp_loss', self.ms['perp'].mean, self.gen_iterations)
 
