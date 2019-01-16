@@ -87,7 +87,7 @@ class GFRNet_warpnet(nn.Module):
     
     def forward(self, blur, guide):
         # pdb.set_trace()
-        ipdb.set_trace()
+        # ipdb.set_trace()
         pair = torch.cat([blur, guide], 1)  # C = 6
         grid = self.warpNet(pair) # NCHW
         grid_NHWC = grid.permute(0,2,3,1)

@@ -59,7 +59,10 @@ class Runner(object):
 
         if opt.debug:
             debug_info ('register grad func to inter tensor')
-            self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
+            if opt.use_mult_gpus:
+                self.G.module.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
+            else:
+                self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
 
     def __del__(self):
         self.writer.close()
@@ -172,6 +175,7 @@ class Runner(object):
 
         # rec_l = perp_l + mse_l
         rec_l = mse_l
+        # rec_l = perp_l
 
 
         # grid.register_hook(grid_grad_func)
