@@ -60,10 +60,10 @@ class Runner(object):
 
         if opt.debug:
             debug_info ('register grad func to inter tensor')
-            if opt.use_mult_gpus:
-                self.G.module.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
-            else:
-                self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
+            # if opt.use_mult_gpus:
+            (self.G.module if opt.use_mult_gpus else self.G).recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
+            # else:
+            #     self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
 
     def __del__(self):
         self.writer.close()
@@ -75,6 +75,13 @@ class Runner(object):
             for m_id in range(len(self.models)):
                 self.models[m_id] = nn.DataParallel(self.models[m_id])
                 self.G, self.GD, self.LD, *self.PD, self.LR = self.models
+            # self.G = nn.DataParallel(self.G)
+            # self.GD = nn.DataParallel(self.GD)
+            # self.LD = nn.DataParallel(self.LD)
+            # for p in range(4):
+            #     self.PD[p] = nn.DataParallel(self.PD[p])
+            # self.LR = nn.DataParallel(self.LR)
+
         # ipdb.set_trace()
 
     def prepare_gan_pair_data(self, d, kind = 'global3'):
@@ -503,8 +510,8 @@ class Runner(object):
             #     'p_p': p_p
             # }
             if ((not opt.no_prewarm_D) and (self.gen_iterations < (opt.prewarm_len + self.start_gen_iters))) or (self.gen_iterations % opt.warm_interval == 0):
-                Diters = 1
-                # Diters = opt.warm_Diters
+                # Diters = 1
+                Diters = opt.warm_Diters
             else:
                 Diters = opt.Diters
 
