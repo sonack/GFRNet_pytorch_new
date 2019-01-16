@@ -31,9 +31,10 @@ fake_label = 0
 
 debug_info ("is_hpc_version", opt.hpc_version)
 if opt.hpc_version:
-    num = opt.num_workers
-    debug_info("set num of threads to %d" % num)
-    torch.set_num_threads(num)
+    # num = opt.num_workers
+    # debug_info("set num of threads to %d" % num)
+    # torch.set_num_threads(num)
+    pass
 
 def noisy_real_label():
     return random.randint(7, 12) / 10
@@ -487,7 +488,7 @@ class Runner(object):
             #     'p_p': p_p
             # }
             if ((not opt.no_prewarm_D) and (self.gen_iterations < (opt.prewarm_len + self.start_gen_iters))) or (self.gen_iterations % opt.warm_interval == 0):
-                Diters = 100
+                Diters = 1
             else:
                 Diters = opt.Diters
 
@@ -496,8 +497,8 @@ class Runner(object):
             
             debug_info ("Diters is", Diters)
             range_obj = range(Diters)
-            if not (opt.hpc_version or opt.skip_train_D):
-                range_obj = tqdm(range_obj)
+            # if not (opt.hpc_version or opt.skip_train_D):
+            range_obj = tqdm(range_obj)
             remain_data = self.train_BNPE - i_b
             if remain_data < Diters:
                 debug_info ("Exhausted data, early finish one epoch! (not update G)")
