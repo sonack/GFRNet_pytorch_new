@@ -113,5 +113,10 @@
 
 
 python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_47_4" --print_freq 1 --disp_freq 1 --save_epoch_freq 1 --pd_L_l_w 10 --pd_R_l_w 10 --pd_N_l_w 10 --pd_M_l_w 10 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_47_3_dataparallelDbg/ckpt_934.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4 --warm_interval 50 --prewarm_len 10 --warm_Diters 20 --use_mult_gpus --debug --manual_seed 4057
+
+# batchsize=14 per gpu(4)
+# tot batchsize=16 gpu(2)
+# python train_wgan.py --cuda --train_img_dir "./DataSets/Original/Train" --train_landmark_dir "./DataSets/Original/Landmark" --test_img_dir "./DataSets/Original/Test/testvgg" --test_landmark_dir "./DataSets/Original/Landmark" --max_epoch 1500 --exp_name "exp_47_4" --print_freq 50 --disp_freq 50 --save_epoch_freq 2 --pd_L_l_w 10 --pd_R_l_w 10 --pd_N_l_w 10 --pd_M_l_w 10 --gd_l_w 1 --ld_l_w 0.5 --lr_l_w 1 --kind "weaker_1" --GD_cond 6 --PD_cond 6 --parts_expand 1.2 --use_WGAN_GP --deconv_kind "subpixel" --lr 2e-4 --load_checkpoint "./checkpoints/exp_47_3_dataparallelDbg/ckpt_934.pt" --mse_l_w 0.1 --perp_l_w 0.005 --vgg_conv_X 4 --warm_interval 50 --prewarm_len 10 --warm_Diters 20 --use_mult_gpus
+# --debug 
 # --no_rec_loss
 

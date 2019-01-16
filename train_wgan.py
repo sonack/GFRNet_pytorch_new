@@ -32,10 +32,9 @@ fake_label = 0
 
 debug_info ("is_hpc_version", opt.hpc_version)
 if opt.hpc_version:
-    # num = opt.num_workers
-    # debug_info("set num of threads to %d" % num)
-    # torch.set_num_threads(num)
-    pass
+    num = opt.num_workers
+    debug_info("set num of threads to %d" % num)
+    torch.set_num_threads(num)
 
 def noisy_real_label():
     return random.randint(7, 12) / 10
@@ -60,10 +59,7 @@ class Runner(object):
 
         if opt.debug:
             debug_info ('register grad func to inter tensor')
-            # if opt.use_mult_gpus:
             (self.G.module if opt.use_mult_gpus else self.G).recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
-            # else:
-            #     self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
 
     def __del__(self):
         self.writer.close()
@@ -520,8 +516,8 @@ class Runner(object):
             
             debug_info ("Diters is", Diters)
             range_obj = range(Diters)
-            # if not (opt.hpc_version or opt.skip_train_D):
-            range_obj = tqdm(range_obj)
+            if not (opt.hpc_version or opt.skip_train_D):
+                range_obj = tqdm(range_obj)
             remain_data = self.train_BNPE - i_b
             if remain_data < Diters:
                 debug_info ("Exhausted data, early finish one epoch! (not update G)")

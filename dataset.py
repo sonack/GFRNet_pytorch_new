@@ -14,6 +14,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import cv2
+# stuck at dataloader with multiple num_workers
+# ref: [https://github.com/pytorch/pytorch/issues/1355]
+cv2.setNumThreads(0)
 import torch
 from custom_utils import clamp_to_0_255, file_suffix
 from opts import opt
