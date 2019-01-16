@@ -2,7 +2,7 @@ from stn_module import STN
 import torch.nn as nn
 from opts import opt
 import torch
-import pdb
+import ipdb
 
 def warpNet_encoder():
     return  nn.Sequential(
@@ -87,6 +87,7 @@ class GFRNet_warpnet(nn.Module):
     
     def forward(self, blur, guide):
         # pdb.set_trace()
+        # ipdb.set_trace()
         pair = torch.cat([blur, guide], 1)  # C = 6
         grid = self.warpNet(pair) # NCHW
         grid_NHWC = grid.permute(0,2,3,1)

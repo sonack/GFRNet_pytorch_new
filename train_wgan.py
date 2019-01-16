@@ -24,6 +24,7 @@ from tqdm import tqdm
 
 from custom_utils import dict2list
 from collections import OrderedDict
+import ipdb
 
 real_label = 1
 fake_label = 0
@@ -55,13 +56,26 @@ class Runner(object):
         self.prepare_losses()
         self.load_checkpoint()
 
+        self.put_to_multiple_gpus()
+
         if opt.debug:
             debug_info ('register grad func to inter tensor')
-            self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
+            if opt.use_mult_gpus:
+                self.G.module.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
+            else:
+                self.G.recNet.encoder[0].weight.register_hook(print_inter_grad("inter grad func"))
 
     def __del__(self):
         self.writer.close()
     
+    def put_to_multiple_gpus(self):
+        # data parallel
+        if opt.use_mult_gpus:
+            print ('Put models to multiple[%d] gpus ...' % torch.cuda.device_count())
+            for m_id in range(len(self.models)):
+                self.models[m_id] = nn.DataParallel(self.models[m_id])
+                self.G, self.GD, self.LD, *self.PD, self.LR = self.models
+        # ipdb.set_trace()
 
     def prepare_gan_pair_data(self, d, kind = 'global3'):
         if kind == 'global3':
@@ -162,6 +176,7 @@ class Runner(object):
 
         # rec_l = perp_l + mse_l
         rec_l = mse_l
+        # rec_l = perp_l
 
 
         # grid.register_hook(grid_grad_func)
@@ -489,6 +504,7 @@ class Runner(object):
             # }
             if ((not opt.no_prewarm_D) and (self.gen_iterations < (opt.prewarm_len + self.start_gen_iters))) or (self.gen_iterations % opt.warm_interval == 0):
                 Diters = 1
+                # Diters = opt.warm_Diters
             else:
                 Diters = opt.Diters
 
@@ -555,9 +571,16 @@ class Runner(object):
             # displaying
             # if self.i_batch_tot % opt.disp_freq == 0:
             if self.gen_iterations % opt.disp_freq == 0:
+                # ------- image disp -------
                 self.writer.add_image('train/guide-gt-blur-warp-res-local_gt-local_res', torch.cat([gd[:opt.disp_img_cnt], gt[:opt.disp_img_cnt], bl[:opt.disp_img_cnt], w_gd[:opt.disp_img_cnt], res[:opt.disp_img_cnt], local_real[:opt.disp_img_cnt], local_fake[:opt.disp_img_cnt]], 2), self.gen_iterations)
-                self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt], parts_real[1][:opt.disp_img_cnt], parts_real[2][:opt.disp_img_cnt], parts_real[3][:opt.disp_img_cnt]], 2), self.gen_iterations)
+                # ipdb.set_trace()
+                self.writer.add_image('train/gt/parts/L-R-N-M', torch.cat([parts_real[0][:opt.disp_img_cnt, 3:], parts_real[1][:opt.disp_img_cnt, 3:], parts_real[2][:opt.disp_img_cnt, 3:], parts_real[3][:opt.disp_img_cnt, 3:]], 2), self.gen_iterations)
+
+                self.writer.add_image('train/rec/parts/L-R-N-M', torch.cat([parts_fake[0][:opt.disp_img_cnt, 3:], parts_fake[1][:opt.disp_img_cnt, 3:], parts_fake[2][:opt.disp_img_cnt, 3:], parts_fake[3][:opt.disp_img_cnt, 3:]], 2), self.gen_iterations)
                 
+                # ------- loss scalars -------
+
+
                 self.writer.add_scalar('train/mse_loss', self.ms['mse'].mean, self.gen_iterations)
                 self.writer.add_scalar('train/perp_loss', self.ms['perp'].mean, self.gen_iterations)
 
@@ -717,13 +740,31 @@ class Runner(object):
                 self.PD_crit.append(nn.BCELoss())
 
             self.LR_crit = nn.BCELoss()
-        
+      
+
+
+
     def load_checkpoint(self):
+        # multi-gpu load [remove module. prefix]
+        # ref: [https://github.com/qiaoguan/Person-reid-GAN-pytorch/blob/master/test.py]
+        def load_network(state_dict):
+            if not list(state_dict.keys())[0].startswith('module.'):
+                return state_dict
+
+            new_state_dict = OrderedDict()
+            for k, v in state_dict.items():
+                nk = k[7:] # remove `module.`
+                new_state_dict[nk] = v
+            return new_state_dict
+        
         if not (opt.load_checkpoint or opt.load_warpnet):
             return
+
+
+        
         if opt.load_checkpoint:
             ckpt = torch.load(opt.load_checkpoint)
-            self.G.load_state_dict(ckpt['model'])
+            self.G.load_state_dict(load_network(ckpt['model']))
             if 'model_GD' in ckpt:
                 # self.GD.load_state_dict(ckpt['model_GD'])
                 pass
@@ -736,10 +777,10 @@ class Runner(object):
             
             if 'model_PD_L' in ckpt:
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
-                    # self.PD[i].load_state_dict(ckpt['model_PD_%c' % p])
-                    pass
+                    self.PD[i].load_state_dict(load_network(ckpt['model_PD_%c' % p]))
+                    # pass
             
-            # self.optim.load_state_dict(ckpt['optim'])
+            self.optim.load_state_dict(ckpt['optim'])
             if 'optim_GD' in ckpt:
                 # self.optimGD.load_state_dict(ckpt['optim_GD'])
                 pass
@@ -749,8 +790,8 @@ class Runner(object):
                 pass
             if 'optim_PD_L' in ckpt:
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
-                    # self.optimPD[i].load_state_dict(ckpt['optim_PD_%c' % p])
-                    pass
+                    self.optimPD[i].load_state_dict(ckpt['optim_PD_%c' % p])
+                    # pass
             
             self.last_epoch = ckpt['epoch']
             # self.i_batch_tot = ckpt['i_batch_tot']
@@ -867,6 +908,8 @@ class Runner(object):
         self.LR.apply(weight_init)
 
         self.models = [self.G, self.GD, self.LD, *self.PD, self.LR]
+
+        
 
     def prepare_data(self):
         train_degradation_tsfm = custom_transforms.DegradationModel(opt.kind, opt.jpeg_last)
