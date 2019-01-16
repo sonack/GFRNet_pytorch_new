@@ -763,8 +763,6 @@ class Runner(object):
         if not (opt.load_checkpoint or opt.load_warpnet):
             return
 
-
-        
         if opt.load_checkpoint:
             ckpt = torch.load(opt.load_checkpoint)
             self.G.load_state_dict(load_network(ckpt['model']))
