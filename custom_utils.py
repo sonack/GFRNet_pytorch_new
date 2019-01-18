@@ -64,7 +64,7 @@ def print_inter_grad(msg, avg = None):
     def func(x):
         # print ("x.size")
         # (16, 2, 256, 256)
-        # print (x.size())
+        # print ("x.size() =", x.size())
         # nonlocal cnt
         if avg:
             avg.add(x.norm().item())
