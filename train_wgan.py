@@ -224,7 +224,9 @@ class Runner(object):
             errLR_G = self.LR_crit(output, label)
         LR_G_l = opt.lr_l_w * errLR_G
 
-        adv_l = PD_G_l
+        adv_l = PD_G_l + LD_G_l
+        # adv_l = LD_G_l
+        # adv_l = PD_G_l
         # adv_l = GD_G_l + PD_G_l + LD_G_l + LR_G_l
         # adv_l = GD_G_l + LD_G_l
         # adv_l = GD_G_l
@@ -341,6 +343,7 @@ class Runner(object):
         ## PD
         errsPD_D = []
         dissPD_D = []
+        gps_PD = []
         for p in range(4):
             PD = self.PD[p]
             optimPD = self.optimPD[p] 
@@ -375,6 +378,7 @@ class Runner(object):
                 dissPD_D.append(dis_PD)
                 if opt.use_WGAN_GP:
                     errPD_D += gp_l
+                    gps_PD.append(gp_l)
             else:
                 errPD_D = (errPD_D_real + errPD_D_fake) / 2
             
@@ -383,7 +387,7 @@ class Runner(object):
 
         PD_D_l = errsPD_D[0] + errsPD_D[1] + errsPD_D[2] + errsPD_D[3]
         wasserstein_dis_PD = dissPD_D[0] + dissPD_D[1] + dissPD_D[2] + dissPD_D[3]
-
+        gp_PD = gps_PD[0] + gps_PD[1] + gps_PD[2] + gps_PD[3]
         ## LR
         self.LR.zero_grad()
         output = self.LR(LR_real)
@@ -434,6 +438,8 @@ class Runner(object):
             self.ms['LD_dis'].add(wasserstein_dis_LD.item())
             self.ms['PD_dis'].add(wasserstein_dis_PD.item())
             self.ms['LR_dis'].add(wasserstein_dis_LR.item())
+
+            self.ms['PD_gp'].add(gp_PD.item())
 
     def prepare_gans_data(self):
         d = {
@@ -583,7 +589,6 @@ class Runner(object):
                 
                 # ------- loss scalars -------
 
-
                 self.writer.add_scalar('train/mse_loss', self.ms['mse'].mean, self.gen_iterations)
                 self.writer.add_scalar('train/perp_loss', self.ms['perp'].mean, self.gen_iterations)
 
@@ -606,6 +611,8 @@ class Runner(object):
                     self.writer.add_scalar('train/wasserstein_dis/LD', self.ms['LD_dis'].mean, self.gen_iterations)
                     self.writer.add_scalar('train/wasserstein_dis/PD', self.ms['PD_dis'].mean, self.gen_iterations)
                     self.writer.add_scalar('train/wasserstein_dis/LR', self.ms['LR_dis'].mean, self.gen_iterations)
+                    # gradient penalty
+                    self.writer.add_scalar('train/PD/gp', self.ms['PD_gp'].mean, self.gen_iterations)
 
 
 
@@ -718,7 +725,7 @@ class Runner(object):
         
     def prepare_losses(self):
         ms = {}
-        keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D', 'PD_G', 'PD_D', 'PD_D_L', 'PD_D_R', 'PD_D_N', 'PD_D_M', 'LR_G', 'LR_D', 'GD_dis', 'LD_dis', 'PD_dis', 'LR_dis']
+        keys = ['sym', 'pt', 'tv', 'mse', 'perp', 'tot', 'GD_G', 'GD_D', 'LD_G', 'LD_D', 'PD_G', 'PD_D', 'PD_D_L', 'PD_D_R', 'PD_D_N', 'PD_D_M', 'LR_G', 'LR_D', 'GD_dis', 'LD_dis', 'PD_dis', 'LR_dis', 'PD_gp']
 
         for key in keys:
             ms[key] = Meter()
@@ -770,13 +777,14 @@ class Runner(object):
                 # self.GD.load_state_dict(ckpt['model_GD'])
                 pass
             if 'model_LD' in ckpt:
-                # print ('model_LD!!')
-                # self.LD.load_state_dict(ckpt['model_LD'])
-                pass
+                print ('Load model_LD!!')
+                self.LD.load_state_dict(load_network(ckpt['model_LD']))
+                # pass
             if 'model_LR' in ckpt:
                 pass
             
             if 'model_PD_L' in ckpt:
+                print ('Load model_PDs!!')
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
                     self.PD[i].load_state_dict(load_network(ckpt['model_PD_%c' % p]))
                     # pass
@@ -786,9 +794,9 @@ class Runner(object):
                 # self.optimGD.load_state_dict(ckpt['optim_GD'])
                 pass
             if 'optim_LD' in ckpt:
-                # print ('optim_LD!!')
-                # self.optimLD.load_state_dict(ckpt['optim_LD'])
-                pass
+                print ('optim_LD!!')
+                self.optimLD.load_state_dict(ckpt['optim_LD'])
+                # pass
             if 'optim_PD_L' in ckpt:
                 for i, p in enumerate(['L', 'R', 'N', 'M']):
                     self.optimPD[i].load_state_dict(ckpt['optim_PD_%c' % p])
